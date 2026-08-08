@@ -1,0 +1,20 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Output — gerado, não versionado individualmente
+# (versionar o diretório mas ignorar binários grandes)
+tenants/*/output/**/*.mp4
+tenants/*/output/**/*.mov
+tenants/*/output/**/*.zip
+
+# Segredos
+.env
+*.key
+*.pem
