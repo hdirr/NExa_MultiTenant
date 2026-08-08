@@ -30,6 +30,21 @@ o contexto correto e guia a execução.
 
 Consolida `tenants/*/metricas.csv` e exibe taxa de aprovação e custo por tenant.
 
+## Painéis
+
+Dois geradores de HTML autocontido (Node, sem dependências externas):
+
+```bash
+node scripts/painel-interno.js          # painel de controle multi-tenant (uso interno)
+node scripts/relatorio-cliente.js leaf  # relatório de resultados de um tenant (para o cliente)
+```
+
+O painel interno sai em `painel/index.html` e mostra pipeline, taxa, custo e
+alertas de todos os tenants. O relatório do cliente sai em
+`tenants/<t>/relatorio.html` e mostra só as entregas e o desempenho daquele
+tenant — sem expor custo interno. Ambos são gerados (não versionados) e
+respeitam o isolamento: o relatório lê apenas o tenant informado.
+
 ## Critério de arquitetura
 
 Onboarding do tenant nº 2 leva menos de uma hora de trabalho técnico.

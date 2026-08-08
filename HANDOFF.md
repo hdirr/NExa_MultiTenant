@@ -47,8 +47,11 @@ tenants/           Um diretório isolado por tenant
       publicados.md       Temas já publicados (base da antirrepetição)
 
 scripts/
-  new-tenant.sh    Onboarding de um novo tenant a partir dos templates
-  metrics.sh       Consolida tenants/*/metricas.csv e mostra taxa de aprovação e custo
+  new-tenant.sh          Onboarding de um novo tenant a partir dos templates
+  metrics.sh             Consolida tenants/*/metricas.csv (taxa de aprovação e custo)
+  painel-interno.js      Gera o painel de controle multi-tenant (uso interno)
+  relatorio-cliente.js   Gera o relatório de resultados de um tenant (para o cliente)
+  lib/painel-comum.js    Biblioteca compartilhada dos geradores (leitura + layout HTML)
 ```
 
 ## Regras inegociáveis (do CLAUDE.md)
@@ -105,6 +108,27 @@ de trabalho técnico.
 
 Consolida os `metricas.csv` de todos os tenants e exibe, por tenant, a taxa da
 última rodada, taxa geral, custo por peça aprovada e número de rodadas.
+
+## Painéis (HTML)
+
+Dois geradores em Node (sem dependências externas), que leem os arquivos dos
+tenants e produzem HTML autocontido:
+
+```bash
+node scripts/painel-interno.js          # -> painel/index.html   (uso interno)
+node scripts/relatorio-cliente.js leaf  # -> tenants/leaf/relatorio.html (cliente)
+```
+
+- **Painel interno** — visão do operador: todos os tenants, pipeline, peças
+  aguardando aprovação, taxa, custo/peça e alertas (inclui "context.md
+  incompleto"). Pode agregar vários tenants porque é uso interno — a regra de
+  isolamento vale para *produção de conteúdo*, não para a gestão.
+- **Relatório do cliente** — um tenant por vez: peças entregues e desempenho.
+  **Não expõe custo interno.** Lê apenas o tenant informado (isolamento).
+
+Os HTMLs gerados não são versionados (`.gitignore`); regenere quando precisar.
+Para um link compartilhável ou PDF, abra o HTML no navegador e imprima, ou peça
+para publicar como artefato.
 
 ## Estado atual
 

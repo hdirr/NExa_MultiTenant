@@ -14,6 +14,13 @@ tenants/*/output/**/*.mp4
 tenants/*/output/**/*.mov
 tenants/*/output/**/*.zip
 
+# Painéis gerados (HTML de saída) — regeráveis a partir dos dados
+painel/
+tenants/*/relatorio.html
+
+# Node
+node_modules/
+
 # Segredos
 .env
 *.key
