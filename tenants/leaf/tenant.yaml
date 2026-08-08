@@ -1,0 +1,29 @@
+tenant: leaf
+nome_exibicao: Leaf
+
+status: ativo                # ativo | pausado | arquivado
+
+negocio:
+  vende: ""                  # uma frase, linguagem de cliente
+  publico: ""                # cargo, porte, setor
+  dor: ""                    # na linguagem do cliente
+  diferencial: ""
+
+canais:
+  - rede: instagram
+    handle: ""
+    formatos: [carrossel]
+    frequencia_semanal: 3
+  - rede: linkedin
+    handle: ""
+    formatos: [post]
+    frequencia_semanal: 1
+
+objetivo: autoridade          # lead | autoridade | educacao | retencao
+aprovador: ""                 # uma pessoa, nome
+janela_antirepeticao_dias: 60
+
+restricoes:
+  assuntos_proibidos: []
+  pode_citar_cliente: false
+  pode_citar_concorrente: false
