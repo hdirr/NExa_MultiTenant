@@ -17,12 +17,14 @@ Ordem: Supabase → rodar SQL → criar admin → rodar local → deploy na Verc
 
 ## 2. Pegar as chaves **[VOCÊ]**
 
-No projeto: **Project Settings → API**. Anote:
+No projeto: **Project Settings → API Keys** (e **General** para a URL). Anote:
 - **Project URL** → vira `NEXT_PUBLIC_SUPABASE_URL`
-- **anon public** (Project API keys) → vira `NEXT_PUBLIC_SUPABASE_ANON_KEY`
+- **Publishable key** (`sb_publishable_...`) → vira
+  `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
-> A chave `anon` é pública/segura de expor no front. **Nunca** use a
-> `service_role` no navegador — ela não é usada nesta fase.
+> A **Publishable key** é pública/segura de expor no front (é a versão nova da
+> antiga "anon key"). **Nunca** use a **Secret key** (`sb_secret_...`) no
+> navegador — ela não é usada nesta fase.
 
 ## 3. Rodar o SQL (criar as tabelas) **[VOCÊ]**
 
@@ -48,8 +50,8 @@ associados a um tenant na Fase 2.
 
 1. Crie o arquivo `web/.env.local` a partir do exemplo:
    ```
-   NEXT_PUBLIC_SUPABASE_URL=...        (o Project URL do passo 2)
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=...   (a anon key do passo 2)
+   NEXT_PUBLIC_SUPABASE_URL=...                 (o Project URL do passo 2)
+   NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY=...      (a publishable key do passo 2)
    ```
 2. No terminal (Git Bash ou PowerShell), dentro de `web/`:
    ```bash
@@ -65,7 +67,7 @@ associados a um tenant na Fase 2.
 2. **Add New → Project** → importe o repositório `NExa_MultiTenant`.
 3. Em **Root Directory**, selecione **`web`** (o app fica nessa subpasta).
 4. Em **Environment Variables**, adicione as duas:
-   `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+   `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
 5. **Deploy**. Ao final, você recebe uma URL (ex.: `conteudo-engine.vercel.app`).
 
 ## 7. Ligar o Auth ao domínio da Vercel **[VOCÊ]**
