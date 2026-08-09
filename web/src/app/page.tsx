@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth";
 import { getClientReport, pct } from "@/lib/data";
@@ -27,11 +28,35 @@ export default async function Home() {
               <div className="font-semibold">{r.tenant?.nome ?? "Seu painel"}</div>
             </div>
           </div>
-          <SignOutButton />
+          <div className="flex items-center gap-4">
+            <Link
+              href="/aprovar"
+              className="text-sm font-semibold text-muted hover:text-foreground"
+            >
+              Aprovações
+              {r.pendentesAprovacao > 0 && (
+                <span className="ml-1.5 text-xs font-bold bg-amber-100 text-amber-800 rounded-full px-2 py-0.5">
+                  {r.pendentesAprovacao}
+                </span>
+              )}
+            </Link>
+            <SignOutButton />
+          </div>
         </div>
       </header>
 
       <main className="max-w-4xl mx-auto px-6 py-10">
+        {r.pendentesAprovacao > 0 && (
+          <Link
+            href="/aprovar"
+            className="flex items-center justify-between gap-3 bg-amber-50 border border-amber-200 text-amber-900 rounded-xl px-4 py-3 mb-6 hover:bg-amber-100 transition"
+          >
+            <span className="text-sm font-medium">
+              Você tem {r.pendentesAprovacao} peça(s) aguardando sua aprovação.
+            </span>
+            <span className="text-sm font-bold">Revisar →</span>
+          </Link>
+        )}
         {!r.tenant ? (
           <div className="bg-card border border-line rounded-2xl p-8 shadow-sm text-center text-muted">
             Nenhum conteúdo associado à sua conta ainda.

@@ -236,3 +236,42 @@ export async function deleteMetric(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidateProducao(slug);
 }
+
+// ── Peças ────────────────────────────────────────────────────────────────────
+export async function addPiece(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const supabase = await createClient();
+  const { error } = await supabase.from("pieces").insert({
+    tenant_id: s(formData, "tenant_id"),
+    titulo: s(formData, "titulo"),
+    formato: s(formData, "formato") || null,
+    conteudo: s(formData, "conteudo") ? { texto: s(formData, "conteudo") } : null,
+    status: "rascunho",
+  });
+  if (error) throw new Error(error.message);
+  revalidateProducao(slug);
+}
+
+export async function sendPieceForApproval(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("pieces")
+    .update({ status: "aguardando_aprovacao" })
+    .eq("id", s(formData, "id"));
+  if (error) throw new Error(error.message);
+  revalidateProducao(slug);
+  revalidatePath("/admin");
+}
+
+export async function deletePiece(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const supabase = await createClient();
+  const { error } = await supabase.from("pieces").delete().eq("id", s(formData, "id"));
+  if (error) throw new Error(error.message);
+  revalidateProducao(slug);
+  revalidatePath("/admin");
+}

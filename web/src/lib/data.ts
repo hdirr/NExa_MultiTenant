@@ -66,13 +66,14 @@ export interface AdminOverview {
 export async function getAdminOverview(): Promise<AdminOverview> {
   const supabase = await createClient();
 
-  const [{ data: tenants }, { data: metrics }, { data: pauta }, { data: channels }, { data: context }] =
+  const [{ data: tenants }, { data: metrics }, { data: pauta }, { data: channels }, { data: context }, { data: pieces }] =
     await Promise.all([
       supabase.from("tenants").select("id, slug, nome_exibicao, status").order("nome_exibicao"),
       supabase.from("metrics").select("tenant_id, data, pecas_geradas, pecas_aprovadas, custo_usd"),
       supabase.from("pauta_items").select("tenant_id, status"),
       supabase.from("channels").select("tenant_id, rede, handle"),
       supabase.from("tenant_context").select("tenant_id, prova_disponivel, o_que_vende"),
+      supabase.from("pieces").select("tenant_id, status"),
     ]);
 
   const byTenantMetrics = new Map<string, MetricRow[]>();
@@ -87,8 +88,8 @@ export async function getAdminOverview(): Promise<AdminOverview> {
   const rows: TenantRow[] = (tenants ?? []).map((t) => {
     const agg = aggregate(byTenantMetrics.get(t.id) ?? []);
     const pautaT = (pauta ?? []).filter((p) => p.tenant_id === t.id);
-    const pendentes = pautaT.filter((p) =>
-      /aguard/i.test(p.status ?? ""),
+    const pendentes = (pieces ?? []).filter(
+      (p) => p.tenant_id === t.id && p.status === "aguardando_aprovacao",
     ).length;
     const ctx = ctxByTenant.get(t.id);
     const incompleto = !ctx || !(ctx.prova_disponivel ?? "").trim();
@@ -144,6 +145,7 @@ export interface ClientReport {
   formatos: { formato: string; n: number }[];
   canais: number;
   taxa: number | null;
+  pendentesAprovacao: number;
   publicados: {
     data: string | null;
     tema: string | null;
@@ -164,10 +166,10 @@ export async function getClientReport(): Promise<ClientReport> {
     .limit(1);
   const tenant = tenants?.[0];
   if (!tenant) {
-    return { tenant: null, entregues: 0, formatos: [], canais: 0, taxa: null, publicados: [] };
+    return { tenant: null, entregues: 0, formatos: [], canais: 0, taxa: null, pendentesAprovacao: 0, publicados: [] };
   }
 
-  const [{ data: publicados }, { data: metrics }, { data: channels }] = await Promise.all([
+  const [{ data: publicados }, { data: metrics }, { data: channels }, { count: pendentes }] = await Promise.all([
     supabase
       .from("published")
       .select("data, tema, formato, link, desempenho")
@@ -178,6 +180,11 @@ export async function getClientReport(): Promise<ClientReport> {
       .select("tenant_id, data, pecas_geradas, pecas_aprovadas, custo_usd")
       .eq("tenant_id", tenant.id),
     supabase.from("channels").select("id").eq("tenant_id", tenant.id),
+    supabase
+      .from("pieces")
+      .select("id", { count: "exact", head: true })
+      .eq("tenant_id", tenant.id)
+      .eq("status", "aguardando_aprovacao"),
   ]);
 
   const formatosMap = new Map<string, number>();
@@ -196,6 +203,7 @@ export async function getClientReport(): Promise<ClientReport> {
       .sort((a, b) => b.n - a.n),
     canais: channels?.length ?? 0,
     taxa: agg.taxa,
+    pendentesAprovacao: pendentes ?? 0,
     publicados: publicados ?? [],
   };
 }

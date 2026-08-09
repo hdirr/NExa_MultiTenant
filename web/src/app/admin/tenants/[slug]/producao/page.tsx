@@ -11,7 +11,18 @@ import {
   deletePublished,
   addMetric,
   deleteMetric,
+  addPiece,
+  sendPieceForApproval,
+  deletePiece,
 } from "../../actions";
+
+const PIECE_STATUS: Record<string, { label: string; cls: string }> = {
+  rascunho: { label: "Rascunho", cls: "bg-black/[0.06] text-muted" },
+  aguardando_aprovacao: { label: "Aguardando aprovação", cls: "bg-amber-100 text-amber-800" },
+  aprovado: { label: "Aprovado", cls: "bg-emerald-100 text-emerald-800" },
+  reprovado: { label: "Reprovado", cls: "bg-red-100 text-red-700" },
+  entregue: { label: "Entregue", cls: "bg-sky-100 text-sky-800" },
+};
 
 const STATUS = [
   { value: "backlog", label: "Backlog" },
@@ -33,12 +44,23 @@ export default async function ProducaoPage({
     .single();
   if (!tenant) notFound();
 
-  const [{ data: pauta }, { data: publicados }, { data: metrics }] =
+  const [{ data: pauta }, { data: publicados }, { data: metrics }, { data: pieces }] =
     await Promise.all([
       supabase.from("pauta_items").select("*").eq("tenant_id", tenant.id).order("created_at"),
       supabase.from("published").select("*").eq("tenant_id", tenant.id).order("data", { ascending: false }),
       supabase.from("metrics").select("*").eq("tenant_id", tenant.id).order("data", { ascending: false }),
+      supabase.from("pieces").select("*").eq("tenant_id", tenant.id).order("created_at", { ascending: false }),
     ]);
+
+  // Aprovações das peças (para mostrar o histórico/comentário do cliente)
+  const pieceIds = (pieces ?? []).map((p) => p.id);
+  const { data: approvals } = pieceIds.length
+    ? await supabase
+        .from("approvals")
+        .select("piece_id, decisao, comentario, created_at")
+        .in("piece_id", pieceIds)
+        .order("created_at", { ascending: false })
+    : { data: [] as { piece_id: string; decisao: string | null; comentario: string | null; created_at: string }[] };
 
   const hid = (
     <>
@@ -56,6 +78,77 @@ export default async function ProducaoPage({
         <h1 className="text-2xl font-bold mt-2">{tenant.nome_exibicao}</h1>
         <p className="text-sm text-muted">Pauta, publicados e métricas</p>
       </div>
+
+      {/* PEÇAS */}
+      <Section
+        title="Peças"
+        desc="Crie a peça, envie para aprovação e o cliente aprova/reprova em /aprovar."
+      >
+        {pieces && pieces.length > 0 ? (
+          <ul className="flex flex-col gap-2 mb-4">
+            {pieces.map((pc) => {
+              const st = PIECE_STATUS[pc.status] ?? PIECE_STATUS.rascunho;
+              const ap = (approvals ?? []).find((a) => a.piece_id === pc.id);
+              return (
+                <li key={pc.id} className="border border-line rounded-lg px-3 py-2">
+                  <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="text-sm">
+                      <span className="font-semibold">{pc.titulo}</span>
+                      {pc.formato && <span className="text-muted"> · {pc.formato}</span>}
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className={`text-xs font-semibold rounded-full px-2.5 py-0.5 ${st.cls}`}>
+                        {st.label}
+                      </span>
+                      {pc.status === "rascunho" && (
+                        <form action={sendPieceForApproval}>
+                          <input type="hidden" name="id" value={pc.id} />
+                          <input type="hidden" name="slug" value={tenant.slug} />
+                          <button className="text-xs font-semibold text-brand hover:underline">
+                            enviar p/ aprovação
+                          </button>
+                        </form>
+                      )}
+                      <form action={deletePiece}>
+                        <input type="hidden" name="id" value={pc.id} />
+                        <input type="hidden" name="slug" value={tenant.slug} />
+                        <button className="text-xs text-red-600 hover:underline">remover</button>
+                      </form>
+                    </div>
+                  </div>
+                  {ap?.comentario && (
+                    <div className="text-xs text-muted mt-1">
+                      Comentário do cliente: “{ap.comentario}”
+                    </div>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted mb-4">Nenhuma peça ainda.</p>
+        )}
+
+        <form action={addPiece} className="grid sm:grid-cols-2 gap-3">
+          {hid}
+          <Field label="Título" name="titulo" required />
+          <Field label="Formato" name="formato" placeholder="carrossel / reels / post" />
+          <div className="sm:col-span-2">
+            <label className="flex flex-col gap-1.5">
+              <span className="text-sm font-semibold text-muted">Conteúdo</span>
+              <textarea
+                name="conteudo"
+                rows={3}
+                placeholder="Texto da peça (roteiro, legenda, etc.)"
+                className="border border-line rounded-lg px-3 py-2 outline-none focus:border-brand bg-card resize-y"
+              />
+            </label>
+          </div>
+          <div className="sm:col-span-2">
+            <SubmitButton>Criar peça</SubmitButton>
+          </div>
+        </form>
+      </Section>
 
       {/* PAUTA */}
       <Section title="Pauta (backlog)">
