@@ -1,5 +1,24 @@
 # Handoff — Conteúdo Engine
 
+> **Atualização 2026-08-09 — App web (SaaS) em `web/`.** O projeto evoluiu de
+> engine em git para um **aplicativo multi-tenant** (Next.js 16 + Supabase +
+> Vercel). Fases 0–4 construídas: login/RLS, dashboards, gestão de tenants,
+> aprovação online e geração por IA no app (Modelo A: chave Anthropic por
+> tenant). Detalhes, setup e deploy em [`web/SETUP.md`](web/SETUP.md); migrações
+> em `web/supabase/migrations/0001..0005.sql`.
+>
+> **Rodar o app:** `cd web && npm install && npm run dev` → http://localhost:3000
+> (env em `web/.env.local`). **Pendências:** rodar migração 0005; configurar a
+> chave Anthropic da Leaf na tela do tenant (Fase 4); trocar o seed de exemplo
+> por dados reais quando o briefing do Cesar voltar; deploy na Vercel.
+>
+> O restante deste documento descreve o **engine de conteúdo** original (skills
+> em markdown + scripts), que continua sendo a fonte das regras portadas para o
+> app.
+
+---
+
+
 Documento de transferência. Explica o que é o projeto, como está organizado,
 como operar e qual o estado atual. Leia isto antes de mexer no repositório.
 
