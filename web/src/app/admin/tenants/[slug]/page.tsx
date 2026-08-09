@@ -9,6 +9,8 @@ import {
   upsertVoice,
   addChannel,
   deleteChannel,
+  createClientUser,
+  removeMember,
 } from "../actions";
 
 export default async function EditTenantPage({
@@ -24,11 +26,15 @@ export default async function EditTenantPage({
     .single();
   if (!tenant) notFound();
 
-  const [{ data: context }, { data: voice }, { data: channels }] =
+  const [{ data: context }, { data: voice }, { data: channels }, { data: members }] =
     await Promise.all([
       supabase.from("tenant_context").select("*").eq("tenant_id", tenant.id).maybeSingle(),
       supabase.from("tenant_voice").select("*").eq("tenant_id", tenant.id).maybeSingle(),
       supabase.from("channels").select("*").eq("tenant_id", tenant.id).order("rede"),
+      supabase
+        .from("tenant_members")
+        .select("profile_id, profiles(full_name, role)")
+        .eq("tenant_id", tenant.id),
     ]);
 
   return (
@@ -178,6 +184,54 @@ export default async function EditTenantPage({
           <Field label="Freq/sem" name="frequencia_semanal" type="number" />
           <div className="sm:col-span-4">
             <SubmitButton>Adicionar canal</SubmitButton>
+          </div>
+        </form>
+      </Section>
+
+      {/* Usuários-cliente */}
+      <Section
+        title="Usuários (clientes)"
+        desc="Contas que fazem login e veem só o relatório deste tenant. Passe as credenciais ao cliente."
+      >
+        {members && members.length > 0 ? (
+          <ul className="flex flex-col gap-2 mb-4">
+            {members.map((m) => {
+              const prof = Array.isArray(m.profiles) ? m.profiles[0] : m.profiles;
+              return (
+                <li
+                  key={m.profile_id}
+                  className="flex items-center justify-between border border-line rounded-lg px-3 py-2"
+                >
+                  <span className="text-sm">
+                    <span className="font-semibold">
+                      {prof?.full_name ?? m.profile_id}
+                    </span>
+                    <span className="text-muted"> · {prof?.role ?? "client"}</span>
+                  </span>
+                  <form action={removeMember}>
+                    <input type="hidden" name="tenant_id" value={tenant.id} />
+                    <input type="hidden" name="profile_id" value={m.profile_id} />
+                    <input type="hidden" name="slug" value={tenant.slug} />
+                    <button className="text-xs text-red-600 hover:underline">
+                      desvincular
+                    </button>
+                  </form>
+                </li>
+              );
+            })}
+          </ul>
+        ) : (
+          <p className="text-sm text-muted mb-4">Nenhum usuário-cliente ainda.</p>
+        )}
+
+        <form action={createClientUser} className="grid sm:grid-cols-3 gap-3">
+          <input type="hidden" name="tenant_id" value={tenant.id} />
+          <input type="hidden" name="slug" value={tenant.slug} />
+          <Field label="Nome" name="nome" placeholder="Nome do cliente" />
+          <Field label="E-mail" name="email" type="email" required placeholder="cliente@empresa.com" />
+          <Field label="Senha inicial" name="password" placeholder="mín. 6 caracteres" hint="compartilhe com o cliente" />
+          <div className="sm:col-span-3">
+            <SubmitButton>Criar acesso do cliente</SubmitButton>
           </div>
         </form>
       </Section>

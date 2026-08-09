@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { createAdminClient } from "@/lib/supabase/admin";
 import { getSessionProfile } from "@/lib/auth";
 
 const s = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() ?? "";
@@ -274,4 +275,51 @@ export async function deletePiece(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidateProducao(slug);
   revalidatePath("/admin");
+}
+
+// ── Usuários-cliente (usa a Secret key via admin client) ─────────────────────
+export async function createClientUser(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const tenantId = s(formData, "tenant_id");
+  const email = s(formData, "email").toLowerCase();
+  const password = s(formData, "password");
+  const nome = s(formData, "nome") || email;
+  if (!email || password.length < 6) {
+    throw new Error("Informe e-mail e uma senha de pelo menos 6 caracteres.");
+  }
+
+  const admin = createAdminClient();
+  const { data: created, error } = await admin.auth.admin.createUser({
+    email,
+    password,
+    email_confirm: true,
+    user_metadata: { full_name: nome },
+  });
+  if (error) throw new Error(error.message);
+  const uid = created.user.id;
+
+  // Garante perfil como cliente e associa ao tenant.
+  await admin.from("profiles").update({ full_name: nome, role: "client" }).eq("id", uid);
+  const { error: mErr } = await admin
+    .from("tenant_members")
+    .insert({ tenant_id: tenantId, profile_id: uid });
+  if (mErr) throw new Error(mErr.message);
+
+  revalidatePath(`/admin/tenants/${slug}`);
+}
+
+export async function removeMember(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const tenantId = s(formData, "tenant_id");
+  const profileId = s(formData, "profile_id");
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("tenant_members")
+    .delete()
+    .eq("tenant_id", tenantId)
+    .eq("profile_id", profileId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/tenants/${slug}`);
 }
