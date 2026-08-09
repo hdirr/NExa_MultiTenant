@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth";
 import { getClientReport, pct } from "@/lib/data";
+import AppHeader from "@/components/AppHeader";
 import SignOutButton from "@/components/SignOutButton";
 
 // Área do cliente: relatório do seu tenant. Admin vai para /admin.
@@ -15,37 +16,28 @@ export default async function Home() {
 
   return (
     <div className="flex-1">
-      <header className="border-b border-line bg-card">
-        <div className="max-w-4xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-brand text-white grid place-items-center font-extrabold">
-              {(r.tenant?.nome ?? "C").charAt(0)}
-            </div>
-            <div>
-              <div className="text-xs font-bold tracking-widest text-brand uppercase">
-                Relatório de Conteúdo
-              </div>
-              <div className="font-semibold">{r.tenant?.nome ?? "Seu painel"}</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
+      <AppHeader
+        width="max-w-4xl"
+        initial={(r.tenant?.nome ?? "C").charAt(0)}
+        kicker="Relatório de Conteúdo"
+        title={r.tenant?.nome ?? "Seu painel"}
+        right={
+          <>
             <Link
               href="/aprovar"
-              className="text-sm font-semibold text-muted hover:text-foreground"
+              className="text-sm font-semibold text-muted hover:text-foreground transition inline-flex items-center"
             >
               Aprovações
               {r.pendentesAprovacao > 0 && (
-                <span className="ml-1.5 text-xs font-bold bg-amber-100 text-amber-800 rounded-full px-2 py-0.5">
-                  {r.pendentesAprovacao}
-                </span>
+                <span className="ml-1.5 pill pill-warn">{r.pendentesAprovacao}</span>
               )}
             </Link>
             <SignOutButton />
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
-      <main className="max-w-4xl mx-auto px-6 py-10">
+      <main className="max-w-4xl mx-auto px-5 sm:px-6 py-8 sm:py-10">
         {r.pendentesAprovacao > 0 && (
           <Link
             href="/aprovar"
@@ -58,7 +50,7 @@ export default async function Home() {
           </Link>
         )}
         {!r.tenant ? (
-          <div className="bg-card border border-line rounded-2xl p-8 shadow-sm text-center text-muted">
+          <div className="card p-10 text-center text-muted">
             Nenhum conteúdo associado à sua conta ainda.
           </div>
         ) : (
@@ -79,7 +71,7 @@ export default async function Home() {
             <h2 className="text-sm font-bold uppercase tracking-wide text-muted mb-3">
               Peças entregues
             </h2>
-            <div className="bg-card border border-line rounded-xl shadow-sm overflow-hidden mb-8">
+            <div className="card overflow-hidden mb-8">
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead>
@@ -93,7 +85,7 @@ export default async function Home() {
                   <tbody>
                     {r.publicados.length ? (
                       r.publicados.map((p, i) => (
-                        <tr key={i} className="border-t border-line">
+                        <tr key={i} className="border-t border-line table-row">
                           <td className="px-4 py-3 text-right tabular-nums whitespace-nowrap text-muted">
                             {p.data ?? ""}
                           </td>
@@ -139,16 +131,19 @@ export default async function Home() {
                 <h2 className="text-sm font-bold uppercase tracking-wide text-muted mb-3">
                   Distribuição por formato
                 </h2>
-                <div className="bg-card border border-line rounded-xl shadow-sm p-5">
+                <div className="card p-5 sm:p-6">
                   {r.formatos.map((f) => (
-                    <div key={f.formato} className="flex items-center gap-3 my-2">
-                      <div className="w-28 capitalize font-semibold">
+                    <div key={f.formato} className="flex items-center gap-3 my-2.5">
+                      <div className="w-28 capitalize font-semibold text-sm">
                         {f.formato}
                       </div>
-                      <div className="flex-1 h-2 rounded-full bg-black/[0.06] overflow-hidden">
+                      <div className="flex-1 h-2.5 rounded-full bg-black/[0.06] overflow-hidden">
                         <div
-                          className="h-full bg-brand"
-                          style={{ width: `${(f.n / maxF) * 100}%` }}
+                          className="h-full rounded-full"
+                          style={{
+                            width: `${(f.n / maxF) * 100}%`,
+                            background: "linear-gradient(90deg, var(--brand-2), var(--brand))",
+                          }}
                         />
                       </div>
                       <div className="w-8 text-right tabular-nums">{f.n}</div>
@@ -166,9 +161,9 @@ export default async function Home() {
 
 function Card({ k, v }: { k: string; v: string }) {
   return (
-    <div className="bg-card border border-line rounded-xl p-4 shadow-sm">
-      <div className="text-xs font-semibold text-muted">{k}</div>
-      <div className="text-3xl font-extrabold mt-1">{v}</div>
+    <div className="card card-hover p-5">
+      <div className="text-xs font-semibold text-muted uppercase tracking-wide">{k}</div>
+      <div className="text-[28px] leading-none font-extrabold mt-2 tracking-tight">{v}</div>
     </div>
   );
 }

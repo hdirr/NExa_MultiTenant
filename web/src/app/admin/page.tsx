@@ -45,14 +45,11 @@ export default async function AdminHome() {
         <h2 className="text-sm font-bold uppercase tracking-wide text-muted">
           Tenants
         </h2>
-        <Link
-          href="/admin/tenants/new"
-          className="bg-brand text-white text-sm font-semibold rounded-lg px-3 py-1.5 hover:opacity-90 transition"
-        >
+        <Link href="/admin/tenants/new" className="btn-primary !py-2 !px-4">
           + Novo tenant
         </Link>
       </div>
-      <div className="bg-card border border-line rounded-xl shadow-sm overflow-hidden">
+      <div className="card overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead>
@@ -70,7 +67,7 @@ export default async function AdminHome() {
             <tbody>
               {tenants.length > 0 ? (
                 tenants.map((t) => (
-                  <tr key={t.slug} className="border-t border-line">
+                  <tr key={t.slug} className="border-t border-line table-row">
                     <td className="px-4 py-3">
                       <Link
                         href={`/admin/tenants/${t.slug}`}
@@ -145,9 +142,9 @@ export default async function AdminHome() {
 
 function Card({ k, v, sub }: { k: string; v: string; sub?: string }) {
   return (
-    <div className="bg-card border border-line rounded-xl p-4 shadow-sm">
-      <div className="text-xs font-semibold text-muted">{k}</div>
-      <div className="text-3xl font-extrabold mt-1">
+    <div className="card card-hover p-5">
+      <div className="text-xs font-semibold text-muted uppercase tracking-wide">{k}</div>
+      <div className="text-[28px] leading-none font-extrabold mt-2 tracking-tight">
         {v}
         {sub && <span className="text-base font-semibold text-muted"> {sub}</span>}
       </div>
@@ -156,14 +153,7 @@ function Card({ k, v, sub }: { k: string; v: string; sub?: string }) {
 }
 
 function StatusPill({ status }: { status: string }) {
-  const map: Record<string, string> = {
-    ativo: "bg-emerald-100 text-emerald-800",
-    pausado: "bg-amber-100 text-amber-800",
-  };
-  const cls = map[status] ?? "bg-black/[0.06] text-muted";
-  return (
-    <span className={`text-xs font-semibold rounded-full px-2.5 py-0.5 ${cls}`}>
-      {status}
-    </span>
-  );
+  const cls =
+    status === "ativo" ? "pill-ok" : status === "pausado" ? "pill-warn" : "pill-muted";
+  return <span className={`pill ${cls}`}>{status}</span>;
 }

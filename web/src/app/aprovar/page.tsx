@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getSessionProfile } from "@/lib/auth";
 import { createClient } from "@/lib/supabase/server";
+import AppHeader from "@/components/AppHeader";
 import SignOutButton from "@/components/SignOutButton";
 import { submitApproval } from "./actions";
 
@@ -19,29 +20,22 @@ export default async function AprovarPage() {
 
   return (
     <div className="flex-1">
-      <header className="border-b border-line bg-card">
-        <div className="max-w-3xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-brand text-white grid place-items-center font-extrabold">
-              ✓
-            </div>
-            <div>
-              <div className="text-xs font-bold tracking-widest text-brand uppercase">
-                Aprovações
-              </div>
-              <div className="font-semibold">Peças aguardando você</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link href="/" className="text-sm font-semibold text-muted hover:text-foreground">
+      <AppHeader
+        width="max-w-3xl"
+        initial="✓"
+        kicker="Aprovações"
+        title="Peças aguardando você"
+        right={
+          <>
+            <Link href="/" className="text-sm font-semibold text-muted hover:text-foreground transition">
               Relatório
             </Link>
             <SignOutButton />
-          </div>
-        </div>
-      </header>
+          </>
+        }
+      />
 
-      <main className="max-w-3xl mx-auto px-6 py-10 flex flex-col gap-4">
+      <main className="max-w-3xl mx-auto px-5 sm:px-6 py-8 sm:py-10 flex flex-col gap-4">
         {pieces && pieces.length > 0 ? (
           pieces.map((p) => {
             const texto =
@@ -49,7 +43,7 @@ export default async function AprovarPage() {
                 ? (p.conteudo as { texto?: string }).texto
                 : null;
             return (
-              <div key={p.id} className="bg-card border border-line rounded-2xl p-6 shadow-sm">
+              <div key={p.id} className="card card-hover p-6">
                 <div className="flex items-center gap-2 mb-2">
                   <h2 className="font-bold text-lg">{p.titulo}</h2>
                   {p.formato && (
@@ -69,22 +63,17 @@ export default async function AprovarPage() {
                     name="comentario"
                     rows={2}
                     placeholder="Comentário (opcional — obrigatório se reprovar)"
-                    className="border border-line rounded-lg px-3 py-2 outline-none focus:border-brand bg-card resize-y text-sm"
+                    className="input resize-y"
                   />
                   <div className="flex gap-3">
-                    <button
-                      type="submit"
-                      name="decisao"
-                      value="aprovado"
-                      className="bg-brand text-white font-semibold rounded-lg px-4 py-2 hover:opacity-90 transition"
-                    >
+                    <button type="submit" name="decisao" value="aprovado" className="btn-primary">
                       Aprovar
                     </button>
                     <button
                       type="submit"
                       name="decisao"
                       value="reprovado"
-                      className="border border-red-300 text-red-700 font-semibold rounded-lg px-4 py-2 hover:bg-red-50 transition"
+                      className="btn-ghost !text-red-700 hover:!border-red-300 hover:!bg-red-50"
                     >
                       Reprovar
                     </button>
@@ -94,7 +83,8 @@ export default async function AprovarPage() {
             );
           })
         ) : (
-          <div className="bg-card border border-line rounded-2xl p-10 shadow-sm text-center text-muted">
+          <div className="card p-12 text-center text-muted">
+            <div className="text-3xl mb-2">✅</div>
             <b className="text-foreground">Nada aguardando aprovação.</b>
             <br />
             Quando houver peças novas, elas aparecem aqui.

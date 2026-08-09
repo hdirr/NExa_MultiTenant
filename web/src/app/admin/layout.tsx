@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import Link from "next/link";
 import { getSessionProfile } from "@/lib/auth";
+import AppHeader from "@/components/AppHeader";
 import SignOutButton from "@/components/SignOutButton";
 
 // Guarda de rota: só admin acessa /admin/*. A autorização é reforçada aqui
@@ -16,34 +17,21 @@ export default async function AdminLayout({
 
   return (
     <div className="flex-1 flex flex-col">
-      <header className="border-b border-line bg-card">
-        <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-lg bg-brand text-white grid place-items-center font-extrabold">
-              C
-            </div>
-            <div>
-              <div className="text-xs font-bold tracking-widest text-brand uppercase">
-                Painel de Controle
-              </div>
-              <div className="font-semibold">Conteúdo Engine</div>
-            </div>
-          </div>
-          <div className="flex items-center gap-4">
-            <Link
-              href="/admin"
-              className="text-sm font-semibold text-muted hover:text-foreground"
-            >
+      <AppHeader
+        initial="C"
+        kicker="Painel de Controle"
+        title="Conteúdo Engine"
+        right={
+          <>
+            <Link href="/admin" className="hidden sm:inline text-sm font-semibold text-muted hover:text-foreground transition">
               Tenants
             </Link>
-            <span className="text-sm text-muted">
-              {sp.fullName ?? sp.email}
-            </span>
+            <span className="hidden md:inline text-sm text-muted">{sp.fullName ?? sp.email}</span>
             <SignOutButton />
-          </div>
-        </div>
-      </header>
-      <main className="flex-1 max-w-6xl w-full mx-auto px-6 py-10">
+          </>
+        }
+      />
+      <main className="flex-1 max-w-6xl w-full mx-auto px-5 sm:px-6 py-8 sm:py-10">
         {children}
       </main>
     </div>

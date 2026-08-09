@@ -9,11 +9,7 @@ export default function SubmitButton({
 }) {
   const { pending } = useFormStatus();
   return (
-    <button
-      type="submit"
-      disabled={pending}
-      className="bg-brand text-white font-semibold rounded-lg px-4 py-2.5 hover:opacity-90 disabled:opacity-60 transition self-start"
-    >
+    <button type="submit" disabled={pending} className="btn-primary self-start">
       {pending ? "Salvando…" : children}
     </button>
   );

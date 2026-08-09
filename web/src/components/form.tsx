@@ -19,14 +19,14 @@ export function Field({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-semibold text-muted">{label}</span>
+      <span className="field-label">{label}</span>
       <input
         name={name}
         type={type}
         defaultValue={defaultValue ?? ""}
         placeholder={placeholder}
         required={required}
-        className="border border-line rounded-lg px-3 py-2 outline-none focus:border-brand bg-card"
+        className="input"
       />
       {hint && <span className="text-xs text-muted">{hint}</span>}
     </label>
@@ -50,13 +50,13 @@ export function TextArea({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-semibold text-muted">{label}</span>
+      <span className="field-label">{label}</span>
       <textarea
         name={name}
         defaultValue={defaultValue ?? ""}
         placeholder={placeholder}
         rows={rows}
-        className="border border-line rounded-lg px-3 py-2 outline-none focus:border-brand bg-card resize-y"
+        className="input resize-y"
       />
       {hint && <span className="text-xs text-muted">{hint}</span>}
     </label>
@@ -76,12 +76,8 @@ export function Select({
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="text-sm font-semibold text-muted">{label}</span>
-      <select
-        name={name}
-        defaultValue={defaultValue ?? options[0]?.value}
-        className="border border-line rounded-lg px-3 py-2 outline-none focus:border-brand bg-card"
-      >
+      <span className="field-label">{label}</span>
+      <select name={name} defaultValue={defaultValue ?? options[0]?.value} className="input">
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
@@ -102,10 +98,10 @@ export function Section({
   children: React.ReactNode;
 }) {
   return (
-    <section className="bg-card border border-line rounded-2xl p-6 shadow-sm">
-      <h2 className="font-bold text-lg">{title}</h2>
-      {desc && <p className="text-sm text-muted mt-1 mb-4">{desc}</p>}
-      <div className={desc ? "" : "mt-4"}>{children}</div>
+    <section className="card card-hover p-6 sm:p-7">
+      <h2 className="font-bold text-lg tracking-tight">{title}</h2>
+      {desc && <p className="text-sm text-muted mt-1 mb-5 max-w-2xl leading-relaxed">{desc}</p>}
+      <div className={desc ? "" : "mt-5"}>{children}</div>
     </section>
   );
 }
