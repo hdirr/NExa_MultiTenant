@@ -132,3 +132,107 @@ export async function deleteChannel(formData: FormData) {
   if (error) throw new Error(error.message);
   revalidatePath(`/admin/tenants/${slug}`);
 }
+
+const n = (fd: FormData, k: string) => {
+  const v = parseFloat(s(fd, k).replace(",", "."));
+  return isNaN(v) ? 0 : v;
+};
+
+function revalidateProducao(slug: string) {
+  revalidatePath(`/admin/tenants/${slug}/producao`);
+  revalidatePath("/admin");
+}
+
+// ── Pauta ───────────────────────────────────────────────────────────────────
+export async function addPauta(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const supabase = await createClient();
+  const { error } = await supabase.from("pauta_items").insert({
+    tenant_id: s(formData, "tenant_id"),
+    tema: s(formData, "tema"),
+    angulo: s(formData, "angulo") || null,
+    formato: s(formData, "formato") || null,
+    objetivo: s(formData, "objetivo") || null,
+    status: s(formData, "status") || "backlog",
+  });
+  if (error) throw new Error(error.message);
+  revalidateProducao(slug);
+}
+
+export async function updatePautaStatus(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from("pauta_items")
+    .update({ status: s(formData, "status") })
+    .eq("id", s(formData, "id"));
+  if (error) throw new Error(error.message);
+  revalidateProducao(slug);
+}
+
+export async function deletePauta(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const supabase = await createClient();
+  const { error } = await supabase.from("pauta_items").delete().eq("id", s(formData, "id"));
+  if (error) throw new Error(error.message);
+  revalidateProducao(slug);
+}
+
+// ── Publicados ───────────────────────────────────────────────────────────────
+export async function addPublished(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const supabase = await createClient();
+  const { error } = await supabase.from("published").insert({
+    tenant_id: s(formData, "tenant_id"),
+    data: s(formData, "data") || null,
+    tema: s(formData, "tema") || null,
+    formato: s(formData, "formato") || null,
+    canal: s(formData, "canal") || null,
+    link: s(formData, "link") || null,
+    desempenho: s(formData, "desempenho") || null,
+  });
+  if (error) throw new Error(error.message);
+  revalidateProducao(slug);
+}
+
+export async function deletePublished(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const supabase = await createClient();
+  const { error } = await supabase.from("published").delete().eq("id", s(formData, "id"));
+  if (error) throw new Error(error.message);
+  revalidateProducao(slug);
+}
+
+// ── Métricas ─────────────────────────────────────────────────────────────────
+export async function addMetric(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const supabase = await createClient();
+  const { error } = await supabase.from("metrics").insert({
+    tenant_id: s(formData, "tenant_id"),
+    data: s(formData, "data") || null,
+    formato: s(formData, "formato") || null,
+    pecas_geradas: n(formData, "pecas_geradas"),
+    pecas_aprovadas: n(formData, "pecas_aprovadas"),
+    tokens_entrada: n(formData, "tokens_entrada"),
+    tokens_saida: n(formData, "tokens_saida"),
+    custo_usd: n(formData, "custo_usd"),
+    minutos_ciclo: n(formData, "minutos_ciclo"),
+  });
+  if (error) throw new Error(error.message);
+  revalidateProducao(slug);
+}
+
+export async function deleteMetric(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const supabase = await createClient();
+  const { error } = await supabase.from("metrics").delete().eq("id", s(formData, "id"));
+  if (error) throw new Error(error.message);
+  revalidateProducao(slug);
+}

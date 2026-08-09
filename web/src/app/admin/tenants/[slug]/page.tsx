@@ -39,6 +39,12 @@ export default async function EditTenantPage({
         </Link>
         <h1 className="text-2xl font-bold mt-2">{tenant.nome_exibicao}</h1>
         <p className="text-sm text-muted">{tenant.slug}</p>
+        <Link
+          href={`/admin/tenants/${tenant.slug}/producao`}
+          className="inline-block mt-3 text-sm font-semibold text-brand hover:underline"
+        >
+          Gerenciar pauta, publicados e métricas →
+        </Link>
       </div>
 
       {/* Dados */}
