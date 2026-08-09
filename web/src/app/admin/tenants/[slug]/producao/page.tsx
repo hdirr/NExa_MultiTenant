@@ -14,6 +14,8 @@ import {
   addPiece,
   sendPieceForApproval,
   deletePiece,
+  generatePautaAI,
+  generatePieceAI,
 } from "../../actions";
 
 const PIECE_STATUS: Record<string, { label: string; cls: string }> = {
@@ -116,6 +118,17 @@ export default async function ProducaoPage({
                       </form>
                     </div>
                   </div>
+                  {(() => {
+                    const rev = (pc.conteudo as { revisao?: { aprovado: boolean; bloqueantes?: unknown[] } } | null)?.revisao;
+                    if (!rev) return null;
+                    return rev.aprovado ? (
+                      <div className="text-xs text-emerald-700 mt-1">✓ revisão de marca: aprovado</div>
+                    ) : (
+                      <div className="text-xs text-red-600 mt-1">
+                        ✗ revisão de marca: {rev.bloqueantes?.length ?? 0} bloqueante(s)
+                      </div>
+                    );
+                  })()}
                   {ap?.comentario && (
                     <div className="text-xs text-muted mt-1">
                       Comentário do cliente: “{ap.comentario}”
@@ -152,6 +165,10 @@ export default async function ProducaoPage({
 
       {/* PAUTA */}
       <Section title="Pauta (backlog)">
+        <form action={generatePautaAI} className="mb-4">
+          {hid}
+          <SubmitButton>✨ Gerar 5 temas com IA</SubmitButton>
+        </form>
         {pauta && pauta.length > 0 ? (
           <ul className="flex flex-col gap-2 mb-4">
             {pauta.map((p) => (
@@ -162,6 +179,12 @@ export default async function ProducaoPage({
                     {p.formato && <span className="text-muted"> · {p.formato}</span>}
                   </div>
                   <div className="flex items-center gap-2">
+                    <form action={generatePieceAI}>
+                      <input type="hidden" name="tenant_id" value={tenant.id} />
+                      <input type="hidden" name="slug" value={tenant.slug} />
+                      <input type="hidden" name="pauta_id" value={p.id} />
+                      <button className="text-xs font-semibold text-brand hover:underline">✨ gerar peça</button>
+                    </form>
                     <form action={updatePautaStatus} className="flex items-center gap-1">
                       <input type="hidden" name="id" value={p.id} />
                       <input type="hidden" name="slug" value={tenant.slug} />

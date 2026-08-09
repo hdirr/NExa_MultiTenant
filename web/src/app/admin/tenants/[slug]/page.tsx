@@ -11,7 +11,9 @@ import {
   deleteChannel,
   createClientUser,
   removeMember,
+  setTenantKey,
 } from "../actions";
+import { tenantHasKey } from "@/lib/generate";
 
 export default async function EditTenantPage({
   params,
@@ -36,6 +38,8 @@ export default async function EditTenantPage({
         .select("profile_id, profiles(full_name, role)")
         .eq("tenant_id", tenant.id),
     ]);
+
+  const hasKey = await tenantHasKey(tenant.id);
 
   return (
     <div className="max-w-2xl flex flex-col gap-6">
@@ -187,6 +191,34 @@ export default async function EditTenantPage({
           </div>
         </form>
       </Section>
+
+      {/* Chave Anthropic (IA) */}
+      <form action={setTenantKey}>
+        <input type="hidden" name="tenant_id" value={tenant.id} />
+        <input type="hidden" name="slug" value={tenant.slug} />
+        <Section
+          title="Chave Anthropic (IA)"
+          desc="Modelo A: cada empresa usa a própria conta Anthropic e paga direto. A chave fica só no servidor, nunca aparece no navegador."
+        >
+          <div className="mb-3">
+            {hasKey ? (
+              <span className="text-sm font-semibold text-emerald-700">✓ Chave configurada</span>
+            ) : (
+              <span className="text-sm font-semibold text-amber-700">Nenhuma chave configurada</span>
+            )}
+          </div>
+          <Field
+            label={hasKey ? "Substituir chave" : "Chave Anthropic (sk-ant-…)"}
+            name="anthropic_key"
+            type="password"
+            placeholder="sk-ant-..."
+            hint="Cole a chave da conta Anthropic da empresa. Deixe vazio e salve para remover."
+          />
+          <div className="mt-4">
+            <SubmitButton>Salvar chave</SubmitButton>
+          </div>
+        </Section>
+      </form>
 
       {/* Usuários-cliente */}
       <Section

@@ -5,6 +5,12 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSessionProfile } from "@/lib/auth";
+import {
+  getTenantKey,
+  gerarPauta,
+  gerarPeca,
+  revisarMarca,
+} from "@/lib/generate";
 
 const s = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() ?? "";
 
@@ -322,4 +328,138 @@ export async function removeMember(formData: FormData) {
     .eq("profile_id", profileId);
   if (error) throw new Error(error.message);
   revalidatePath(`/admin/tenants/${slug}`);
+}
+
+// ── IA (Fase 4) ──────────────────────────────────────────────────────────────
+export async function setTenantKey(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const tenantId = s(formData, "tenant_id");
+  const key = s(formData, "anthropic_key");
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("tenant_secrets")
+    .upsert(
+      { tenant_id: tenantId, anthropic_key: key || null, updated_at: new Date().toISOString() },
+      { onConflict: "tenant_id" },
+    );
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/tenants/${slug}`);
+}
+
+// Carrega o contexto isolado do tenant para os prompts de IA.
+async function carregarContexto(tenantId: string) {
+  const supabase = await createClient();
+  const [{ data: tenant }, { data: ctx }, { data: voice }, { data: pubs }] =
+    await Promise.all([
+      supabase.from("tenants").select("id, nome_exibicao, objetivo").eq("id", tenantId).single(),
+      supabase.from("tenant_context").select("*").eq("tenant_id", tenantId).maybeSingle(),
+      supabase.from("tenant_voice").select("*").eq("tenant_id", tenantId).maybeSingle(),
+      supabase.from("published").select("tema").eq("tenant_id", tenantId),
+    ]);
+  return {
+    t: { id: tenantId, nome: tenant?.nome_exibicao ?? "", objetivo: tenant?.objetivo },
+    ctx: ctx ?? {},
+    voice: voice ?? {},
+    publicadosTemas: (pubs ?? []).map((p) => p.tema).filter(Boolean) as string[],
+  };
+}
+
+async function logMetric(
+  tenantId: string,
+  formato: string,
+  geradas: number,
+  aprovadas: number,
+  usage: { input: number; output: number; custo: number },
+) {
+  const admin = createAdminClient();
+  await admin.from("metrics").insert({
+    tenant_id: tenantId,
+    data: new Date().toISOString().slice(0, 10),
+    formato,
+    pecas_geradas: geradas,
+    pecas_aprovadas: aprovadas,
+    tokens_entrada: usage.input,
+    tokens_saida: usage.output,
+    custo_usd: usage.custo,
+    minutos_ciclo: 0,
+  });
+}
+
+export async function generatePautaAI(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const tenantId = s(formData, "tenant_id");
+  const key = await getTenantKey(tenantId);
+  if (!key) throw new Error("Configure a chave Anthropic deste tenant antes de gerar.");
+
+  const { t, ctx, voice, publicadosTemas } = await carregarContexto(tenantId);
+  const { parsed, usage } = await gerarPauta(key, t, ctx, voice, publicadosTemas);
+  const temas: { tema: string; angulo: string; formato: string; objetivo: string }[] =
+    parsed?.temas ?? [];
+
+  const admin = createAdminClient();
+  if (temas.length) {
+    await admin.from("pauta_items").insert(
+      temas.map((x) => ({
+        tenant_id: tenantId,
+        tema: x.tema,
+        angulo: x.angulo,
+        formato: x.formato,
+        objetivo: x.objetivo,
+        status: "backlog",
+      })),
+    );
+  }
+  await logMetric(tenantId, "pauta", temas.length, 0, usage);
+  revalidatePath(`/admin/tenants/${slug}/producao`);
+  revalidatePath("/admin");
+}
+
+export async function generatePieceAI(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const tenantId = s(formData, "tenant_id");
+  const pautaId = s(formData, "pauta_id");
+  const key = await getTenantKey(tenantId);
+  if (!key) throw new Error("Configure a chave Anthropic deste tenant antes de gerar.");
+
+  const supabase = await createClient();
+  const { data: pauta } = await supabase
+    .from("pauta_items")
+    .select("tema, angulo, formato")
+    .eq("id", pautaId)
+    .single();
+  if (!pauta) throw new Error("Tema de pauta não encontrado.");
+
+  const { t, ctx, voice, publicadosTemas } = await carregarContexto(tenantId);
+  const formato = pauta.formato || "post";
+
+  const peca = await gerarPeca(key, t, ctx, voice, publicadosTemas, pauta.tema, pauta.angulo, formato);
+  const texto: string = peca.parsed?.conteudo ?? "";
+  const titulo: string = peca.parsed?.titulo ?? pauta.tema;
+
+  // Gate: revisão de marca antes de virar peça.
+  const rev = await revisarMarca(key, t, ctx, voice, publicadosTemas, texto);
+  const aprovado: boolean = rev.parsed?.aprovado ?? false;
+  const bloqueantes = rev.parsed?.bloqueantes ?? [];
+
+  const admin = createAdminClient();
+  await admin.from("pieces").insert({
+    tenant_id: tenantId,
+    pauta_id: pautaId,
+    formato,
+    titulo,
+    conteudo: { texto, revisao: { aprovado, bloqueantes } },
+    status: "rascunho",
+  });
+
+  const usage = {
+    input: peca.usage.input + rev.usage.input,
+    output: peca.usage.output + rev.usage.output,
+    custo: peca.usage.custo + rev.usage.custo,
+  };
+  await logMetric(tenantId, formato, 1, aprovado ? 1 : 0, usage);
+  revalidatePath(`/admin/tenants/${slug}/producao`);
+  revalidatePath("/admin");
 }
