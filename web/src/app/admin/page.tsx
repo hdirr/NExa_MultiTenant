@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getAdminOverview, pct, money } from "@/lib/data";
 
 export default async function AdminHome() {
@@ -40,9 +41,17 @@ export default async function AdminHome() {
       </section>
 
       {/* Tabela de tenants */}
-      <h2 className="text-sm font-bold uppercase tracking-wide text-muted mb-3">
-        Tenants
-      </h2>
+      <div className="flex items-center justify-between mb-3">
+        <h2 className="text-sm font-bold uppercase tracking-wide text-muted">
+          Tenants
+        </h2>
+        <Link
+          href="/admin/tenants/new"
+          className="bg-brand text-white text-sm font-semibold rounded-lg px-3 py-1.5 hover:opacity-90 transition"
+        >
+          + Novo tenant
+        </Link>
+      </div>
       <div className="bg-card border border-line rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
@@ -63,7 +72,12 @@ export default async function AdminHome() {
                 tenants.map((t) => (
                   <tr key={t.slug} className="border-t border-line">
                     <td className="px-4 py-3">
-                      <div className="font-semibold">{t.nome}</div>
+                      <Link
+                        href={`/admin/tenants/${t.slug}`}
+                        className="font-semibold hover:text-brand hover:underline"
+                      >
+                        {t.nome}
+                      </Link>
                       <div className="text-xs text-muted">
                         {t.slug}
                         {t.incompleto && (
