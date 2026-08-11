@@ -77,4 +77,9 @@ contrato nos dois lados (prompt + tags do Canva).
 3. Deploy p/ OAuth de produção e uso pelos clientes.
 
 ## Estado
-- 2026-08-11: plano criado. Iniciando Fase 5.0.
+- 2026-08-11: plano criado. Fases 5.0–5.2 (código) construídas.
+- 2026-08-11: **código conferido contra a spec viva da Canva Connect API** —
+  OAuth (authorize/token/PKCE/Basic), autofill (`job.result.design.id/url`) e
+  export (`job.urls[]`) batem 100%. Nenhum ajuste de shape necessário. Bloqueios
+  restantes são só os passos `[VOCÊ]`: registrar o app dev + colar credenciais no
+  `.env.local`, rodar a migração 0006, e montar 1 Brand Template por tenant.
