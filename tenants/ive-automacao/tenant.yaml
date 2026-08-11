@@ -1,0 +1,33 @@
+tenant: ive-automacao
+nome_exibicao: IVE Automação
+
+status: ativo                # ativo | pausado | arquivado
+
+negocio:
+  vende: "Organiza e automatiza o atendimento de PMEs com CRM, IA e automações personalizadas (produto: IVE CRM)"
+  publico: "Donos, diretores comerciais e gerentes seniores de PMEs que atendem clientes pelo WhatsApp"
+  dor: "Atendimento desorganizado: demora pra responder, leads sem retorno, oportunidades perdidas, equipe presa no repetitivo"
+  diferencial: "Não é CRM genérico pra configurar sozinho — diagnóstico + processo + implantação consultiva + IA treinada ao contexto"
+
+canais:
+  - rede: instagram
+    handle: "@iveautomacao"
+    formatos: [carrossel]
+    frequencia_semanal: 3
+  - rede: linkedin
+    handle: ""                 # a definir
+    formatos: [post]
+    frequencia_semanal: 0      # entra quando o perfil for definido
+
+objetivo: lead                 # lead (gerar demanda p/ IVE CRM); também autoridade e educação
+aprovador: "Rafael Costa"      # Fundador da IVE
+janela_antirepeticao_dias: 60
+
+restricoes:
+  assuntos_proibidos:
+    - "métricas, ROI, percentuais ou economia de horas sem prova autorizada"
+    - "nomes, prints, falas ou logos de clientes sem autorização"
+    - "promessas absolutas: 'IA que nunca erra', '100% sem intervenção humana', 'substitua sua equipe por IA'"
+    - "garantias de resultado: 'venda garantida', 'aumente vendas em X%'"
+  pode_citar_cliente: false
+  pode_citar_concorrente: false
