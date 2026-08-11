@@ -22,6 +22,17 @@ export async function tenantHasKey(tenantId: string): Promise<boolean> {
   return (await getTenantKey(tenantId)) !== null;
 }
 
+// Lê o Brand Template do Canva configurado para o tenant (server-only).
+export async function getTenantCanvaTemplate(tenantId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("tenant_secrets")
+    .select("canva_template_id")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  return data?.canva_template_id ?? null;
+}
+
 // Regras duras compartilhadas (do CLAUDE.md + skills).
 function regrasDuras(ctx: Ctx, voice: Voice, publicadosTemas: string[]) {
   return `REGRAS INEGOCIÁVEIS (do CLAUDE.md e das skills):
@@ -207,6 +218,40 @@ Retorne aprovado (true/false) e a lista de bloqueantes (item do checklist + expl
       },
     },
     required: ["aprovado", "bloqueantes"],
+  };
+  return callJSON(key, system, user, schema);
+}
+
+// ── Carrossel estruturado (campos p/ autofill do Canva) ──────────────────────
+// Devolve os campos nomeados do template: hook, s2..s7, cta.
+// Limites de caractere vão no prompt (structured outputs não valida maxLength).
+export async function gerarCarrosselCampos(
+  key: string,
+  t: TenantInfo,
+  ctx: Ctx,
+  voice: Voice,
+  publicadosTemas: string[],
+  tema: string,
+  angulo: string,
+) {
+  const system = `Você produz um carrossel de Instagram da marca "${t.nome}" no formato de campos para um template fixo de 8 slides.
+Estrutura e LIMITES (respeite à risca, senão o texto estoura o layout):
+- hook: gancho da capa, máximo 45 caracteres, sem pergunta genérica.
+- s2 a s7: um argumento por slide, ancorado em exemplo/consequência, máximo 220 caracteres cada.
+- cta: chamada para ação coerente com o objetivo, máximo 110 caracteres.
+${regrasDuras(ctx, voice, publicadosTemas)}`;
+  const user = `${contextoBloco(ctx, voice, t)}
+
+Tema aprovado: ${tema}
+Ângulo: ${angulo}
+
+Produza o carrossel preenchendo EXATAMENTE os campos hook, s2, s3, s4, s5, s6, s7, cta. Texto pronto para publicar, dentro dos limites de caractere. Se não houver prova para um número, mude o ângulo do slide — nunca invente.`;
+  const props = ["hook", "s2", "s3", "s4", "s5", "s6", "s7", "cta"];
+  const schema = {
+    type: "object",
+    additionalProperties: false,
+    properties: Object.fromEntries(props.map((p) => [p, { type: "string" }])),
+    required: props,
   };
   return callJSON(key, system, user, schema);
 }

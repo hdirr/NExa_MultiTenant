@@ -1,8 +1,12 @@
 import Link from "next/link";
 import { getAdminOverview, pct, money } from "@/lib/data";
+import { isCanvaConnected } from "@/lib/canva";
 
-export default async function AdminHome() {
+export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
+  const sp = await searchParams;
+  const canva = typeof sp.canva === "string" ? sp.canva : undefined;
   const { tenants, totais, alertas } = await getAdminOverview();
+  const canvaOn = await isCanvaConnected();
 
   return (
     <div>
@@ -38,6 +42,31 @@ export default async function AdminHome() {
             <span>Nada pendente. Todos os tenants em dia.</span>
           </div>
         )}
+      </section>
+
+      {/* Integração Canva (arte) */}
+      <section className="mb-8">
+        <div className="card p-5 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-sm font-bold">Integração Canva (arte)</div>
+            <div className="text-xs text-muted mt-0.5">
+              {canvaOn
+                ? "Conta da agência conectada. As peças de carrossel podem gerar arte."
+                : "Conecte a conta Canva da agência (uma vez) para gerar arte pelas peças."}
+            </div>
+            {canva === "conectado" && (
+              <div className="text-xs text-emerald-700 mt-1">✓ Conectado com sucesso.</div>
+            )}
+            {canva && canva !== "conectado" && (
+              <div className="text-xs text-red-700 mt-1">
+                Não foi possível conectar ({canva}). Verifique as credenciais e tente de novo.
+              </div>
+            )}
+          </div>
+          <a href="/api/canva/connect" className="btn-primary !py-2 !px-4 whitespace-nowrap">
+            {canvaOn ? "Reconectar Canva" : "Conectar Canva"}
+          </a>
+        </div>
       </section>
 
       {/* Tabela de tenants */}

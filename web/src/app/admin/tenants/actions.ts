@@ -7,10 +7,13 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import { getSessionProfile } from "@/lib/auth";
 import {
   getTenantKey,
+  getTenantCanvaTemplate,
   gerarPauta,
   gerarPeca,
+  gerarCarrosselCampos,
   revisarMarca,
 } from "@/lib/generate";
+import { autofillCarrossel, exportarPng, isCanvaConnected } from "@/lib/canva";
 
 const s = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() ?? "";
 
@@ -347,6 +350,25 @@ export async function setTenantKey(formData: FormData) {
   revalidatePath(`/admin/tenants/${slug}`);
 }
 
+// Salva o Brand Template do Canva (BTM…) do tenant.
+export async function setTenantCanvaTemplate(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const tenantId = s(formData, "tenant_id");
+  const templateId = s(formData, "canva_template_id");
+  const admin = createAdminClient();
+  const { error } = await admin.from("tenant_secrets").upsert(
+    {
+      tenant_id: tenantId,
+      canva_template_id: templateId || null,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: "tenant_id" },
+  );
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/tenants/${slug}`);
+}
+
 // Carrega o contexto isolado do tenant para os prompts de IA.
 async function carregarContexto(tenantId: string) {
   const supabase = await createClient();
@@ -434,10 +456,28 @@ export async function generatePieceAI(formData: FormData) {
 
   const { t, ctx, voice, publicadosTemas } = await carregarContexto(tenantId);
   const formato = pauta.formato || "post";
+  const isCarrossel = /carrossel|carousel/i.test(formato);
 
-  const peca = await gerarPeca(key, t, ctx, voice, publicadosTemas, pauta.tema, pauta.angulo, formato);
-  const texto: string = peca.parsed?.conteudo ?? "";
-  const titulo: string = peca.parsed?.titulo ?? pauta.tema;
+  // Carrossel sai em campos nomeados (hook, s2..s7, cta) p/ o autofill do Canva.
+  // Outros formatos seguem no textão único.
+  let texto: string;
+  let titulo: string;
+  let campos: Record<string, string> | null = null;
+  let usageGen: { input: number; output: number; custo: number };
+
+  if (isCarrossel) {
+    const c = await gerarCarrosselCampos(key, t, ctx, voice, publicadosTemas, pauta.tema, pauta.angulo);
+    campos = (c.parsed as Record<string, string> | null) ?? null;
+    const ordem = ["hook", "s2", "s3", "s4", "s5", "s6", "s7", "cta"];
+    texto = ordem.map((k, i) => `${i + 1}. ${campos?.[k] ?? ""}`).join("\n");
+    titulo = pauta.tema;
+    usageGen = c.usage;
+  } else {
+    const peca = await gerarPeca(key, t, ctx, voice, publicadosTemas, pauta.tema, pauta.angulo, formato);
+    texto = peca.parsed?.conteudo ?? "";
+    titulo = peca.parsed?.titulo ?? pauta.tema;
+    usageGen = peca.usage;
+  }
 
   // Gate: revisão de marca antes de virar peça.
   const rev = await revisarMarca(key, t, ctx, voice, publicadosTemas, texto);
@@ -450,16 +490,54 @@ export async function generatePieceAI(formData: FormData) {
     pauta_id: pautaId,
     formato,
     titulo,
-    conteudo: { texto, revisao: { aprovado, bloqueantes } },
+    conteudo: { texto, campos, revisao: { aprovado, bloqueantes } },
     status: "rascunho",
   });
 
   const usage = {
-    input: peca.usage.input + rev.usage.input,
-    output: peca.usage.output + rev.usage.output,
-    custo: peca.usage.custo + rev.usage.custo,
+    input: usageGen.input + rev.usage.input,
+    output: usageGen.output + rev.usage.output,
+    custo: usageGen.custo + rev.usage.custo,
   };
   await logMetric(tenantId, formato, 1, aprovado ? 1 : 0, usage);
   revalidatePath(`/admin/tenants/${slug}/producao`);
   revalidatePath("/admin");
+}
+
+// Gera a arte da peça no Canva: preenche o Brand Template com os campos e
+// exporta as imagens. Requer conta Canva conectada + template no tenant.
+export async function generateArtAI(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const tenantId = s(formData, "tenant_id");
+  const pieceId = s(formData, "piece_id");
+
+  const templateId = await getTenantCanvaTemplate(tenantId);
+  if (!templateId) {
+    throw new Error("Configure o Brand Template do Canva (ID BTM) deste tenant antes de gerar arte.");
+  }
+  if (!(await isCanvaConnected())) {
+    throw new Error("Conecte a conta Canva da agência no painel antes de gerar arte.");
+  }
+
+  const supabase = await createClient();
+  const { data: piece } = await supabase
+    .from("pieces")
+    .select("conteudo")
+    .eq("id", pieceId)
+    .single();
+  const campos = (piece?.conteudo as { campos?: Record<string, string> } | null)?.campos;
+  if (!campos || Object.keys(campos).length === 0) {
+    throw new Error("Esta peça não tem campos de carrossel. Gere a peça no formato carrossel primeiro.");
+  }
+
+  const { designId } = await autofillCarrossel(templateId, campos);
+  const imagens = await exportarPng(designId);
+
+  const admin = createAdminClient();
+  await admin
+    .from("pieces")
+    .update({ arte: { design_id: designId, imagens } })
+    .eq("id", pieceId);
+  revalidateProducao(slug);
 }

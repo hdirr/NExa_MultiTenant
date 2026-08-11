@@ -16,6 +16,7 @@ import {
   deletePiece,
   generatePautaAI,
   generatePieceAI,
+  generateArtAI,
 } from "../../actions";
 
 const PIECE_STATUS: Record<string, { label: string; cls: string }> = {
@@ -128,6 +129,39 @@ export default async function ProducaoPage({
                         ✗ revisão de marca: {rev.bloqueantes?.length ?? 0} bloqueante(s)
                       </div>
                     );
+                  })()}
+                  {(() => {
+                    const campos = (pc.conteudo as { campos?: Record<string, string> } | null)?.campos;
+                    const arte = pc.arte as { imagens?: string[] } | null;
+                    if (arte?.imagens?.length) {
+                      return (
+                        <div className="flex flex-wrap gap-2 mt-2">
+                          {arte.imagens.map((src, i) => (
+                            <a key={i} href={src} target="_blank" rel="noreferrer">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={src}
+                                alt={`slide ${i + 1}`}
+                                className="h-20 w-20 object-cover rounded border border-line"
+                              />
+                            </a>
+                          ))}
+                        </div>
+                      );
+                    }
+                    if (campos && Object.keys(campos).length) {
+                      return (
+                        <form action={generateArtAI} className="mt-2">
+                          <input type="hidden" name="piece_id" value={pc.id} />
+                          <input type="hidden" name="tenant_id" value={tenant.id} />
+                          <input type="hidden" name="slug" value={tenant.slug} />
+                          <button className="text-xs font-semibold text-brand hover:underline">
+                            ✨ gerar arte no Canva
+                          </button>
+                        </form>
+                      );
+                    }
+                    return null;
                   })()}
                   {ap?.comentario && (
                     <div className="text-xs text-muted mt-1">
