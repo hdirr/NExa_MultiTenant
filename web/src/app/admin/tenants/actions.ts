@@ -624,3 +624,16 @@ export async function listCanvaTemplatesAction(): Promise<BrandTemplateItem[]> {
   }
   return listarBrandTemplates();
 }
+
+// Exclui o tenant e TODO o conteúdo relacionado (cascata no banco: pautas,
+// peças, aprovações, contexto, voz, canais, métricas, secrets/template).
+// NÃO remove os usuários de login (podem existir fora deste tenant).
+export async function deleteTenant(formData: FormData) {
+  await requireAdmin();
+  const tenantId = s(formData, "tenant_id");
+  if (!tenantId) throw new Error("tenant inválido");
+  const admin = createAdminClient();
+  const { error } = await admin.from("tenants").delete().eq("id", tenantId);
+  if (error) throw new Error(error.message);
+  redirect("/admin");
+}

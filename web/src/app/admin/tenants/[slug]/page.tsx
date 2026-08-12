@@ -4,6 +4,7 @@ import { createClient } from "@/lib/supabase/server";
 import { Field, TextArea, Select, Section } from "@/components/form";
 import SubmitButton from "@/components/SubmitButton";
 import CanvaTemplatePicker from "./CanvaTemplatePicker";
+import DeleteTenantButton from "./DeleteTenantButton";
 import {
   updateTenant,
   upsertContext,
@@ -272,6 +273,19 @@ export default async function EditTenantPage({
           </div>
         </form>
       </Section>
+
+      {/* Zona de perigo */}
+      <section className="card p-6 sm:p-7 border border-red-200">
+        <h2 className="font-bold text-lg tracking-tight text-red-700">Zona de perigo</h2>
+        <p className="text-sm text-muted mt-1 mb-5 max-w-2xl leading-relaxed">
+          Excluir o tenant apaga permanentemente todo o conteúdo dele (pautas, peças, aprovações,
+          contexto, voz, canais, chave e template). Os usuários de login não são removidos.
+        </p>
+        <DeleteTenantButton
+          tenantId={tenant.id}
+          nome={tenant.nome_exibicao ?? tenant.slug}
+        />
+      </section>
     </div>
   );
 }
