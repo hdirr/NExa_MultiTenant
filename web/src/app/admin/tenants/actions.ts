@@ -20,6 +20,7 @@ import {
   listarBrandTemplates,
   criarPasta,
   moverParaPasta,
+  criarDesignDoTemplate,
   type BrandTemplateItem,
 } from "@/lib/canva";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -37,22 +38,60 @@ export async function createTenant(formData: FormData) {
   if (!/^[a-z0-9-]+$/.test(slug)) {
     throw new Error("slug inválido: use apenas letras minúsculas, números e hífen");
   }
-  const supabase = await createClient();
-  const { error } = await supabase.from("tenants").insert({
-    slug,
-    nome_exibicao: s(formData, "nome_exibicao") || slug,
-    status: s(formData, "status") || "ativo",
-    objetivo: s(formData, "objetivo") || null,
-    aprovador: s(formData, "aprovador") || null,
-    negocio_vende: s(formData, "negocio_vende") || null,
-    negocio_publico: s(formData, "negocio_publico") || null,
-    negocio_dor: s(formData, "negocio_dor") || null,
-    negocio_diferencial: s(formData, "negocio_diferencial") || null,
-  });
+  const nome = s(formData, "nome_exibicao") || slug;
+  const admin = createAdminClient();
+  const { data: novo, error } = await admin
+    .from("tenants")
+    .insert({
+      slug,
+      nome_exibicao: nome,
+      status: s(formData, "status") || "ativo",
+      objetivo: s(formData, "objetivo") || null,
+      aprovador: s(formData, "aprovador") || null,
+      negocio_vende: s(formData, "negocio_vende") || null,
+      negocio_publico: s(formData, "negocio_publico") || null,
+      negocio_dor: s(formData, "negocio_dor") || null,
+      negocio_diferencial: s(formData, "negocio_diferencial") || null,
+    })
+    .select("id")
+    .single();
   if (error) throw new Error(error.message);
+
+  // Provisiona a pasta do cliente no Canva + uma cópia do modelo-mestre dentro
+  // dela. Best-effort: se o Canva não estiver conectado / sem escopo, ignora.
+  try {
+    await provisionCanvaForTenant(admin, novo!.id as string, nome);
+  } catch (e) {
+    console.error("Canva: provisionamento do tenant (ignorado):", (e as Error).message);
+  }
 
   revalidatePath("/admin");
   redirect(`/admin/tenants/${slug}`);
+}
+
+// Cria a pasta do tenant no Canva e semeia uma cópia editável do template-mestre
+// dentro dela (modelo pronto para rebrand). Guarda o folder_id no tenant.
+async function provisionCanvaForTenant(
+  admin: SupabaseClient,
+  tenantId: string,
+  nome: string,
+) {
+  if (!(await isCanvaConnected())) return;
+
+  const folderId = await criarPasta(`NExa — ${nome}`);
+  await admin.from("tenant_secrets").upsert(
+    { tenant_id: tenantId, canva_folder_id: folderId, updated_at: new Date().toISOString() },
+    { onConflict: "tenant_id" },
+  );
+
+  // Semente do modelo (cópia editável do mestre). Se falhar, a pasta já ficou.
+  const master = process.env.CANVA_MASTER_TEMPLATE || "EAHSCPMYcB8";
+  try {
+    const designId = await criarDesignDoTemplate(master);
+    await moverParaPasta(designId, folderId);
+  } catch (e) {
+    console.error("Canva: semente do modelo na pasta (ignorado):", (e as Error).message);
+  }
 }
 
 export async function updateTenant(formData: FormData) {

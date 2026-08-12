@@ -162,3 +162,15 @@ export async function moverParaPasta(itemId: string, folderId: string): Promise<
     body: JSON.stringify({ to_folder_id: folderId, item_id: itemId }),
   });
 }
+
+// Cria um design editável a partir de um Brand Template (cópia) e devolve o id.
+// Usado para semear a pasta do cliente com um modelo pronto para rebrand.
+export async function criarDesignDoTemplate(brandTemplateId: string): Promise<string> {
+  const j = await canvaFetch(`/designs`, {
+    method: "POST",
+    body: JSON.stringify({ type: "brand_template", brand_template_id: brandTemplateId }),
+  });
+  const id = j.design?.id;
+  if (!id) throw new Error("Canva não retornou o design criado a partir do template.");
+  return id as string;
+}
