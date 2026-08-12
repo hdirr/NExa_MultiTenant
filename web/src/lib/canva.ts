@@ -73,14 +73,18 @@ export async function getAccessToken(): Promise<string> {
   return valid ? c.access_token! : refreshToken(c.refresh_token);
 }
 
-async function canvaFetch(path: string, init?: RequestInit) {
+async function canvaFetchRaw(path: string, init?: RequestInit) {
   const token = await getAccessToken();
   const r = await fetch(`${API}${path}`, {
     ...init,
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...(init?.headers ?? {}) },
   });
   if (!r.ok) throw new Error(`Canva ${path} → ${r.status} ${await r.text()}`);
-  return r.json();
+  return r;
+}
+
+async function canvaFetch(path: string, init?: RequestInit) {
+  return (await canvaFetchRaw(path, init)).json();
 }
 
 // Autofill e export são JOBS assíncronos: cria → poll até success.
@@ -122,4 +126,39 @@ export async function exportarPng(designId: string): Promise<string[]> {
   });
   const job = await pollJob(`/exports`, created.job.id);
   return (job.urls ?? []) as string[];
+}
+
+// ── Brand Templates (para o seletor no painel) ──────────────────────────────
+export interface BrandTemplateItem {
+  id: string;
+  title: string;
+}
+
+// Lista os Brand Templates da conta Canva conectada (só os com dataset de
+// autofill). Requer o escopo brandtemplate:meta:read.
+export async function listarBrandTemplates(): Promise<BrandTemplateItem[]> {
+  const j = await canvaFetch(`/brand-templates?dataset=non_empty&limit=100&sort_by=modified_descending`);
+  const items = (j.items ?? []) as { id: string; title?: string }[];
+  return items.map((it) => ({ id: it.id, title: it.title || "(sem título)" }));
+}
+
+// ── Pastas (organizar as artes por cliente) ─────────────────────────────────
+// Requer os escopos folder:read / folder:write. Cria uma pasta na raiz e
+// devolve o id. O app guarda esse id no tenant (canva_folder_id).
+export async function criarPasta(nome: string): Promise<string> {
+  const j = await canvaFetch(`/folders`, {
+    method: "POST",
+    body: JSON.stringify({ name: nome.slice(0, 255), parent_folder_id: "root" }),
+  });
+  const id = j.folder?.id;
+  if (!id) throw new Error("Canva não retornou o id da pasta.");
+  return id as string;
+}
+
+// Move um item (design) para uma pasta. Resposta 204 sem corpo.
+export async function moverParaPasta(itemId: string, folderId: string): Promise<void> {
+  await canvaFetchRaw(`/folders/move`, {
+    method: "POST",
+    body: JSON.stringify({ to_folder_id: folderId, item_id: itemId }),
+  });
 }

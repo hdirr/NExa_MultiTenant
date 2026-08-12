@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Field, TextArea, Select, Section } from "@/components/form";
 import SubmitButton from "@/components/SubmitButton";
+import CanvaTemplatePicker from "./CanvaTemplatePicker";
 import {
   updateTenant,
   upsertContext,
@@ -12,7 +13,6 @@ import {
   createClientUser,
   removeMember,
   setTenantKey,
-  setTenantCanvaTemplate,
 } from "../actions";
 import { tenantHasKey, getTenantCanvaTemplate } from "@/lib/generate";
 
@@ -223,32 +223,7 @@ export default async function EditTenantPage({
       </form>
 
       {/* Brand Template do Canva (arte) */}
-      <form action={setTenantCanvaTemplate}>
-        <input type="hidden" name="tenant_id" value={tenant.id} />
-        <input type="hidden" name="slug" value={tenant.slug} />
-        <Section
-          title="Template do Canva (arte)"
-          desc="Brand Template com os campos hook, s2…s7, cta. Depois de gerar a peça de carrossel, o app preenche este template e exporta as imagens."
-        >
-          <div className="mb-3">
-            {canvaTemplate ? (
-              <span className="text-sm font-semibold text-emerald-700">✓ Template configurado</span>
-            ) : (
-              <span className="text-sm font-semibold text-amber-700">Nenhum template configurado</span>
-            )}
-          </div>
-          <Field
-            label="ID do Brand Template (BTM…)"
-            name="canva_template_id"
-            placeholder="BTM..."
-            defaultValue={canvaTemplate ?? ""}
-            hint="Cole o ID do Brand Template do Canva deste cliente. Deixe vazio e salve para remover."
-          />
-          <div className="mt-4">
-            <SubmitButton>Salvar template</SubmitButton>
-          </div>
-        </Section>
-      </form>
+      <CanvaTemplatePicker tenantId={tenant.id} slug={tenant.slug} current={canvaTemplate} />
 
       {/* Usuários-cliente */}
       <Section

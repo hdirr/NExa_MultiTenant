@@ -13,7 +13,16 @@ import {
   gerarCarrosselCampos,
   revisarMarca,
 } from "@/lib/generate";
-import { autofillCarrossel, exportarPng, isCanvaConnected } from "@/lib/canva";
+import {
+  autofillCarrossel,
+  exportarPng,
+  isCanvaConnected,
+  listarBrandTemplates,
+  criarPasta,
+  moverParaPasta,
+  type BrandTemplateItem,
+} from "@/lib/canva";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 const s = (fd: FormData, k: string) => (fd.get(k) as string | null)?.trim() ?? "";
 
@@ -514,30 +523,104 @@ export async function generateArtAI(formData: FormData) {
 
   const templateId = await getTenantCanvaTemplate(tenantId);
   if (!templateId) {
-    throw new Error("Configure o Brand Template do Canva (ID BTM) deste tenant antes de gerar arte.");
+    throw new Error("Configure o Brand Template do Canva deste tenant antes de gerar arte.");
   }
   if (!(await isCanvaConnected())) {
     throw new Error("Conecte a conta Canva da agência no painel antes de gerar arte.");
   }
 
   const supabase = await createClient();
-  const { data: piece } = await supabase
-    .from("pieces")
-    .select("conteudo")
-    .eq("id", pieceId)
-    .single();
+  const [{ data: piece }, { data: tenant }] = await Promise.all([
+    supabase.from("pieces").select("conteudo").eq("id", pieceId).single(),
+    supabase.from("tenants").select("nome_exibicao").eq("id", tenantId).maybeSingle(),
+  ]);
   const campos = (piece?.conteudo as { campos?: Record<string, string> } | null)?.campos;
   if (!campos || Object.keys(campos).length === 0) {
     throw new Error("Esta peça não tem campos de carrossel. Gere a peça no formato carrossel primeiro.");
   }
 
   const { designId } = await autofillCarrossel(templateId, campos);
-  const imagens = await exportarPng(designId);
 
   const admin = createAdminClient();
+
+  // Organiza o design na pasta do cliente no Canva. Best-effort: se faltar o
+  // escopo folder:write (reconectar) ou falhar, NÃO quebra a geração da arte.
+  try {
+    const nome = (tenant?.nome_exibicao as string | undefined) || slug;
+    const folderId = await getOrCreateTenantFolder(admin, tenantId, nome);
+    await moverParaPasta(designId, folderId);
+  } catch (e) {
+    console.error("Canva: não movi para a pasta do cliente (ignorado):", (e as Error).message);
+  }
+
+  const urls = await exportarPng(designId);
+
+  // Rehospeda os PNGs no Storage para não expirarem (URLs do Canva duram ~24h).
+  const imagens = await rehospedarImagens(admin, tenantId, pieceId, urls);
+
   await admin
     .from("pieces")
     .update({ arte: { design_id: designId, imagens } })
     .eq("id", pieceId);
   revalidateProducao(slug);
+}
+
+// Acha (ou cria uma vez) a pasta do Canva do tenant e devolve o id.
+async function getOrCreateTenantFolder(
+  admin: SupabaseClient,
+  tenantId: string,
+  nome: string,
+): Promise<string> {
+  const { data } = await admin
+    .from("tenant_secrets")
+    .select("canva_folder_id")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  const existing = (data?.canva_folder_id as string | null) ?? null;
+  if (existing) return existing;
+
+  const folderId = await criarPasta(`NExa — ${nome}`);
+  await admin.from("tenant_secrets").upsert(
+    { tenant_id: tenantId, canva_folder_id: folderId, updated_at: new Date().toISOString() },
+    { onConflict: "tenant_id" },
+  );
+  return folderId;
+}
+
+// Baixa cada PNG do Canva e rehospeda no bucket público "artes". Se algo
+// falhar, cai de volta na URL do Canva (efêmera) para não perder a imagem.
+async function rehospedarImagens(
+  admin: SupabaseClient,
+  tenantId: string,
+  pieceId: string,
+  urls: string[],
+): Promise<string[]> {
+  const out: string[] = [];
+  const stamp = Date.now();
+  for (let i = 0; i < urls.length; i++) {
+    try {
+      const resp = await fetch(urls[i]);
+      if (!resp.ok) throw new Error(`download ${resp.status}`);
+      const buf = Buffer.from(await resp.arrayBuffer());
+      const path = `${tenantId}/${pieceId}/${stamp}-${i + 1}.png`;
+      const { error } = await admin.storage
+        .from("artes")
+        .upload(path, buf, { contentType: "image/png", upsert: true });
+      if (error) throw new Error(error.message);
+      out.push(admin.storage.from("artes").getPublicUrl(path).data.publicUrl);
+    } catch (e) {
+      console.error("Rehospedar arte (usando URL do Canva):", (e as Error).message);
+      out.push(urls[i]);
+    }
+  }
+  return out;
+}
+
+// Lista os Brand Templates da conta Canva (para o seletor no painel do tenant).
+export async function listCanvaTemplatesAction(): Promise<BrandTemplateItem[]> {
+  await requireAdmin();
+  if (!(await isCanvaConnected())) {
+    throw new Error("Conecte a conta Canva da agência no painel antes de buscar templates.");
+  }
+  return listarBrandTemplates();
 }

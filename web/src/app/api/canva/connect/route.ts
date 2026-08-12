@@ -12,6 +12,8 @@ const SCOPES = [
   "brandtemplate:meta:read",
   "brandtemplate:content:read",
   "asset:read",
+  "folder:read",
+  "folder:write",
 ].join(" ");
 
 const b64url = (b: Buffer) =>
