@@ -21,7 +21,8 @@ export async function GET(request: NextRequest) {
   const clientId = process.env.CANVA_CLIENT_ID;
   const clientSecret = process.env.CANVA_CLIENT_SECRET;
   if (!clientId || !clientSecret) return back("sem_credenciais");
-  const redirectUri = process.env.CANVA_REDIRECT_URI ?? `${origin}/api/canva/callback`;
+  // Mesmo redirect derivado do origin usado no /connect (não usa env).
+  const redirectUri = `${origin}/api/canva/callback`;
 
   const basic = Buffer.from(`${clientId}:${clientSecret}`).toString("base64");
   const r = await fetch(TOKEN_URL, {

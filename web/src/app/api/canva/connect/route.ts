@@ -24,8 +24,10 @@ export async function GET(request: Request) {
   if (!clientId) {
     return new Response("CANVA_CLIENT_ID não configurado no .env.local.", { status: 500 });
   }
+  // Sempre derivado do endereço onde o app está rodando (evita divergência com
+  // uma env mal configurada). O mesmo valor é usado no /callback.
   const origin = new URL(request.url).origin;
-  const redirectUri = process.env.CANVA_REDIRECT_URI ?? `${origin}/api/canva/callback`;
+  const redirectUri = `${origin}/api/canva/callback`;
 
   const verifier = b64url(crypto.randomBytes(32));
   const challenge = b64url(crypto.createHash("sha256").update(verifier).digest());
