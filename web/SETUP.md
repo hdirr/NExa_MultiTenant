@@ -66,15 +66,34 @@ associados a um tenant na Fase 2.
 1. Acesse https://vercel.com e entre com a conta do GitHub.
 2. **Add New → Project** → importe o repositório `NExa_MultiTenant`.
 3. Em **Root Directory**, selecione **`web`** (o app fica nessa subpasta).
-4. Em **Environment Variables**, adicione as duas:
-   `NEXT_PUBLIC_SUPABASE_URL` e `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`.
+4. Em **Environment Variables**, adicione **TODAS** as do seu `web/.env.local`
+   (menos linhas de comentário):
+   - `NEXT_PUBLIC_SUPABASE_URL`
+   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+   - `SUPABASE_SECRET_KEY` — server-only; cria usuários-cliente e lê
+     segredos/tokens (chave Anthropic por tenant, tokens do Canva). Sem ela o
+     painel admin e a geração quebram.
+   - `CANVA_CLIENT_ID`
+   - `CANVA_CLIENT_SECRET`
+   - `CANVA_REDIRECT_URI` = `https://SEU-APP.vercel.app/api/canva/callback`
+     (ajuste depois de saber a URL final — ver passo 7).
 5. **Deploy**. Ao final, você recebe uma URL (ex.: `conteudo-engine.vercel.app`).
 
-## 7. Ligar o Auth ao domínio da Vercel **[VOCÊ]**
+## 7. Ajustes pós-deploy **[VOCÊ]**
 
-No Supabase: **Authentication → URL Configuration** → em **Site URL** e
-**Redirect URLs**, adicione a URL da Vercel (ex.:
-`https://conteudo-engine.vercel.app`). Isso garante o login em produção.
+1. **Auth (login em produção)** — Supabase → **Authentication → URL
+   Configuration** → em **Site URL** e **Redirect URLs**, adicione a URL da
+   Vercel (ex.: `https://conteudo-engine.vercel.app`).
+2. **Canva (só se for reconectar em produção)** — Canva Developers → sua
+   integração → **Authentication → Authorized redirects** → adicione
+   `https://SEU-APP.vercel.app/api/canva/callback`. Depois volte na Vercel,
+   ajuste `CANVA_REDIRECT_URI` para essa URL e **redeploy**.
+   > A conexão do Canva já feita continua valendo: os tokens ficam no banco
+   > (`canva_connection`) e são renovados sozinhos, sem depender do redirect.
+   > Isso só é necessário se você clicar em "Reconectar Canva" em produção.
+3. **Banco** — se a produção usa o **mesmo** projeto Supabase de agora, as
+   tabelas (migrações 0001–0006) já estão aplicadas. Se for um banco novo, rode
+   `web/supabase/migrations/0001…0006` no SQL Editor antes de usar.
 
 ---
 
