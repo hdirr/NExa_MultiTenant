@@ -32,11 +32,18 @@ async function requireAdmin() {
   if (!sp || sp.role !== "admin") throw new Error("não autorizado");
 }
 
-export async function createTenant(formData: FormData) {
+export type CreateTenantState = { error: string } | null;
+
+export async function createTenant(
+  _prev: CreateTenantState,
+  formData: FormData,
+): Promise<CreateTenantState> {
   await requireAdmin();
-  const slug = s(formData, "slug").toLowerCase();
+  const slug = s(formData, "slug").toLowerCase().trim();
   if (!/^[a-z0-9-]+$/.test(slug)) {
-    throw new Error("slug inválido: use apenas letras minúsculas, números e hífen");
+    return {
+      error: "Slug inválido: use apenas letras minúsculas, números e hífen (sem espaços ou acentos).",
+    };
   }
   const nome = s(formData, "nome_exibicao") || slug;
   const admin = createAdminClient();
@@ -55,7 +62,14 @@ export async function createTenant(formData: FormData) {
     })
     .select("id")
     .single();
-  if (error) throw new Error(error.message);
+  if (error) {
+    // 23505 = unique_violation (slug já existe). Mostra mensagem amigável em vez
+    // de quebrar a página com um erro de servidor.
+    if (error.code === "23505") {
+      return { error: `Já existe um tenant com o slug "${slug}". Escolha outro identificador.` };
+    }
+    return { error: error.message };
+  }
 
   // Provisiona a pasta do cliente no Canva + uma cópia do modelo-mestre dentro
   // dela. Best-effort: se o Canva não estiver conectado / sem escopo, ignora.
