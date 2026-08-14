@@ -6,8 +6,16 @@ import { createClient } from "@/lib/supabase/client";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
+  // Auto-preenchimento de teste: ativo apenas se o ambiente definir as
+  // variáveis (NEXT_PUBLIC_ENABLE_TEST_FILL=true + credenciais). Nunca setar
+  // em produção.
+  const testFill = process.env.NEXT_PUBLIC_ENABLE_TEST_FILL === "true";
+  const [email, setEmail] = useState(
+    testFill ? (process.env.NEXT_PUBLIC_TEST_ADMIN_EMAIL ?? "") : "",
+  );
+  const [password, setPassword] = useState(
+    testFill ? (process.env.NEXT_PUBLIC_TEST_ADMIN_PASSWORD ?? "") : "",
+  );
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -76,6 +84,11 @@ export default function LoginPage() {
         <p className="text-xs text-muted text-center mt-5">
           Acesso restrito · contas criadas pelo administrador
         </p>
+        {testFill && (
+          <p className="text-xs text-center text-muted mt-2">
+            Ambiente de teste: credenciais pré-preenchidas.
+          </p>
+        )}
       </div>
     </main>
   );

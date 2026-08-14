@@ -8,6 +8,8 @@ export function Field({
   placeholder,
   required,
   hint,
+  value,
+  onChange,
 }: {
   label: string;
   name: string;
@@ -16,14 +18,19 @@ export function Field({
   placeholder?: string;
   required?: boolean;
   hint?: string;
+  value?: string;
+  onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }) {
+  const controlled = value !== undefined;
   return (
     <label className="flex flex-col gap-1.5">
       <span className="field-label">{label}</span>
       <input
         name={name}
         type={type}
-        defaultValue={defaultValue ?? ""}
+        value={controlled ? value : undefined}
+        defaultValue={controlled ? undefined : (defaultValue ?? "")}
+        onChange={onChange}
         placeholder={placeholder}
         required={required}
         className="input"

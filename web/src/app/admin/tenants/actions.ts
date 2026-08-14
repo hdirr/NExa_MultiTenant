@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { getSessionProfile } from "@/lib/auth";
+import { slugify } from "@/lib/slugify";
 import {
   getTenantKey,
   getTenantCanvaTemplate,
@@ -39,48 +40,68 @@ export async function createTenant(
   formData: FormData,
 ): Promise<CreateTenantState> {
   await requireAdmin();
-  const slug = s(formData, "slug").toLowerCase().trim();
+  const nome = s(formData, "nome_exibicao");
+  const slugDigitado = s(formData, "slug").toLowerCase().trim();
+  const autoSlug = !slugDigitado;
+  const slug = autoSlug ? slugify(nome) : slugDigitado;
+  if (!slug) {
+    return {
+      error: "Informe o nome do tenant (o slug é gerado automaticamente a partir dele).",
+    };
+  }
   if (!/^[a-z0-9-]+$/.test(slug)) {
     return {
       error: "Slug inválido: use apenas letras minúsculas, números e hífen (sem espaços ou acentos).",
     };
   }
-  const nome = s(formData, "nome_exibicao") || slug;
   const admin = createAdminClient();
-  const { data: novo, error } = await admin
-    .from("tenants")
-    .insert({
-      slug,
-      nome_exibicao: nome,
-      status: s(formData, "status") || "ativo",
-      objetivo: s(formData, "objetivo") || null,
-      aprovador: s(formData, "aprovador") || null,
-      negocio_vende: s(formData, "negocio_vende") || null,
-      negocio_publico: s(formData, "negocio_publico") || null,
-      negocio_dor: s(formData, "negocio_dor") || null,
-      negocio_diferencial: s(formData, "negocio_diferencial") || null,
-    })
-    .select("id")
-    .single();
-  if (error) {
-    // 23505 = unique_violation (slug já existe). Mostra mensagem amigável em vez
-    // de quebrar a página com um erro de servidor.
-    if (error.code === "23505") {
+  // Slug digitado tem prioridade; se estiver em uso, erro amigável. Slug
+  // automático tenta variantes (teste-2, teste-3…) para não travar o fluxo.
+  let novo: { id: string } | null = null;
+  let slugUsado = slug;
+  for (let attempt = 0; attempt < 10 && !novo; attempt++) {
+    const candidato = attempt === 0 ? slug : `${slug}-${attempt + 1}`;
+    const { data, error } = await admin
+      .from("tenants")
+      .insert({
+        slug: candidato,
+        nome_exibicao: nome || candidato,
+        status: s(formData, "status") || "ativo",
+        objetivo: s(formData, "objetivo") || null,
+        aprovador: s(formData, "aprovador") || null,
+        negocio_vende: s(formData, "negocio_vende") || null,
+        negocio_publico: s(formData, "negocio_publico") || null,
+        negocio_dor: s(formData, "negocio_dor") || null,
+        negocio_diferencial: s(formData, "negocio_diferencial") || null,
+      })
+      .select("id")
+      .single();
+    if (!error) {
+      novo = data;
+      slugUsado = candidato;
+      break;
+    }
+    // 23505 = unique_violation (slug já existe). Slug digitado → erro amigável.
+    if (error.code !== "23505") return { error: error.message };
+    if (!autoSlug) {
       return { error: `Já existe um tenant com o slug "${slug}". Escolha outro identificador.` };
     }
-    return { error: error.message };
   }
+  if (!novo) {
+    return { error: `Não foi possível gerar um slug único a partir de "${slug}".` };
+  }
+  const tenantId = novo.id as string;
 
   // Provisiona a pasta do cliente no Canva + uma cópia do modelo-mestre dentro
   // dela. Best-effort: se o Canva não estiver conectado / sem escopo, ignora.
   try {
-    await provisionCanvaForTenant(admin, novo!.id as string, nome);
+    await provisionCanvaForTenant(admin, tenantId, nome || slug);
   } catch (e) {
     console.error("Canva: provisionamento do tenant (ignorado):", (e as Error).message);
   }
 
   revalidatePath("/admin");
-  redirect(`/admin/tenants/${slug}`);
+  redirect(`/admin/tenants/${slugUsado}`);
 }
 
 // Cria a pasta do tenant no Canva e semeia uma cópia editável do template-mestre
