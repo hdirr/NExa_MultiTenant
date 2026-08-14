@@ -349,15 +349,21 @@ export async function deletePiece(formData: FormData) {
 }
 
 // ── Usuários-cliente (usa a Secret key via admin client) ─────────────────────
-export async function createClientUser(formData: FormData) {
+export type CreateClientUserState = { error: string } | null;
+
+export async function createClientUser(
+  _prev: CreateClientUserState,
+  formData: FormData,
+): Promise<CreateClientUserState> {
   await requireAdmin();
   const slug = s(formData, "slug");
   const tenantId = s(formData, "tenant_id");
   const email = s(formData, "email").toLowerCase();
   const password = s(formData, "password");
   const nome = s(formData, "nome") || email;
-  if (!email || password.length < 6) {
-    throw new Error("Informe e-mail e uma senha de pelo menos 6 caracteres.");
+  if (!email) return { error: "Informe o e-mail do cliente." };
+  if (password.length < 6) {
+    return { error: "A senha deve ter pelo menos 6 caracteres." };
   }
 
   const admin = createAdminClient();
@@ -367,17 +373,33 @@ export async function createClientUser(formData: FormData) {
     email_confirm: true,
     user_metadata: { full_name: nome },
   });
-  if (error) throw new Error(error.message);
+  if (error) {
+    if (error.code === "email_exists") {
+      return {
+        error: `Já existe uma conta com o e-mail "${email}". Use outro e-mail para criar um novo acesso.`,
+      };
+    }
+    return { error: `Não foi possível criar o usuário: ${error.message}` };
+  }
   const uid = created.user.id;
 
   // Garante perfil como cliente e associa ao tenant.
-  await admin.from("profiles").update({ full_name: nome, role: "client" }).eq("id", uid);
+  const { error: pErr } = await admin
+    .from("profiles")
+    .update({ full_name: nome, role: "client" })
+    .eq("id", uid);
+  if (pErr) {
+    return { error: `Não foi possível configurar o perfil: ${pErr.message}` };
+  }
   const { error: mErr } = await admin
     .from("tenant_members")
     .insert({ tenant_id: tenantId, profile_id: uid });
-  if (mErr) throw new Error(mErr.message);
+  if (mErr) {
+    return { error: `Não foi possível vincular ao tenant: ${mErr.message}` };
+  }
 
   revalidatePath(`/admin/tenants/${slug}`);
+  return null;
 }
 
 export async function removeMember(formData: FormData) {

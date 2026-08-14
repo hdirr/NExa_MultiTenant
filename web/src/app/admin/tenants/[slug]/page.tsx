@@ -5,13 +5,13 @@ import { Field, TextArea, Select, Section } from "@/components/form";
 import SubmitButton from "@/components/SubmitButton";
 import CanvaTemplatePicker from "./CanvaTemplatePicker";
 import DeleteTenantButton from "./DeleteTenantButton";
+import CreateClientUserForm from "./CreateClientUserForm";
 import {
   updateTenant,
   upsertContext,
   upsertVoice,
   addChannel,
   deleteChannel,
-  createClientUser,
   removeMember,
   setTenantKey,
 } from "../actions";
@@ -262,16 +262,7 @@ export default async function EditTenantPage({
           <p className="text-sm text-muted mb-4">Nenhum usuário-cliente ainda.</p>
         )}
 
-        <form action={createClientUser} className="grid sm:grid-cols-3 gap-3">
-          <input type="hidden" name="tenant_id" value={tenant.id} />
-          <input type="hidden" name="slug" value={tenant.slug} />
-          <Field label="Nome" name="nome" placeholder="Nome do cliente" />
-          <Field label="E-mail" name="email" type="email" required placeholder="cliente@empresa.com" />
-          <Field label="Senha inicial" name="password" placeholder="mín. 6 caracteres" hint="compartilhe com o cliente" />
-          <div className="sm:col-span-3">
-            <SubmitButton>Criar acesso do cliente</SubmitButton>
-          </div>
-        </form>
+        <CreateClientUserForm tenantId={tenant.id} slug={tenant.slug} />
       </Section>
 
       {/* Zona de perigo */}
