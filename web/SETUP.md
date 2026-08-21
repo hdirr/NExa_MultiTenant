@@ -92,8 +92,12 @@ associados a um tenant na Fase 2.
    > (`canva_connection`) e são renovados sozinhos, sem depender do redirect.
    > Isso só é necessário se você clicar em "Reconectar Canva" em produção.
 3. **Banco** — se a produção usa o **mesmo** projeto Supabase de agora, as
-   tabelas (migrações 0001–0006) já estão aplicadas. Se for um banco novo, rode
-   `web/supabase/migrations/0001…0006` no SQL Editor antes de usar.
+   tabelas (migrações 0001–0010) já estão aplicadas. Se for um banco novo, rode
+   `web/supabase/migrations/0001…0010` no SQL Editor antes de usar (a 0009
+   cria o papel `owner` e precisa vir antes da 0010).
+4. **Auto-cadastro** — o fluxo de onboarding autônomo (`/cadastro` → fila de
+   pendentes no painel → ativação) está documentado em
+   [`ONBOARDING.md`](ONBOARDING.md).
 
 ---
 

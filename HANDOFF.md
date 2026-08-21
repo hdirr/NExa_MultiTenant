@@ -1,5 +1,18 @@
 # Handoff — Conteúdo Engine
 
+> **Atualização 2026-08-21 — Fase 7: onboarding autônomo.** O negócio agora se
+> cadastra sozinho em `/cadastro` (rota pública): cria usuário com papel
+> **owner**, tenant `pendente`, vínculo e pasta Canva numa server action — sem
+> script, sem login paralelo. Você ativa na fila do painel (`/admin` →
+> "Aguardando ativação"); enquanto pendente, produção bloqueada
+> (`exigirTenantAtivo`). Owner gerencia só o próprio tenant (RLS nova +
+> trigger impede mudança de status); admin continua mandando em tudo.
+> Checklist guiado na página do tenant aponta o que falta; `/perfil` permite
+> editar nome/senha. Migrações novas: `0009_owner_role.sql` (papel owner) e
+> `0010_owner_policies.sql` (permissões + status pendente) — **rodar no Supabase
+> nesta ordem antes do primeiro cadastro**. Detalhes e decisões (por que não
+> Express/YAML/JWT/subdomínios) em [`web/ONBOARDING.md`](web/ONBOARDING.md).
+>
 > **Atualização 2026-08-21 — Interface sem digitação + arte completa no Canva +
 > imagens IA.** Forms viraram escolhas prontas (checkbox/seleção/ideias
 > clicáveis que preenchem e seguem editáveis); campos cruciais vazios ficam
