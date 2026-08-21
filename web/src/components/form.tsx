@@ -150,14 +150,16 @@ export function CheckboxGroup({
 export function Section({
   title,
   desc,
+  id,
   children,
 }: {
   title: string;
   desc?: string;
+  id?: string;
   children: React.ReactNode;
 }) {
   return (
-    <section className="card card-hover p-6 sm:p-7">
+    <section id={id} className="card card-hover p-6 sm:p-7 scroll-mt-24">
       <h2 className="font-bold text-lg tracking-tight">{title}</h2>
       {desc && <p className="text-sm text-muted mt-1 mb-5 max-w-2xl leading-relaxed">{desc}</p>}
       <div className={desc ? "" : "mt-5"}>{children}</div>

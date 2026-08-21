@@ -1,12 +1,27 @@
 import Link from "next/link";
-import { getAdminOverview, pct, money } from "@/lib/data";
+import { redirect } from "next/navigation";
+import { getAdminOverview, getPendentesTenants, pct, money } from "@/lib/data";
 import { isCanvaConnected } from "@/lib/canva";
+import { getSessionProfile, getOwnedTenantSlug } from "@/lib/auth";
+import { setTenantStatus } from "./tenants/actions";
 
 export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
   const sp = await searchParams;
   const canva = typeof sp.canva === "string" ? sp.canva : undefined;
+
+  // Owner (dono) não vê o painel geral: cai direto no próprio tenant.
+  const perfil = await getSessionProfile();
+  if (perfil?.role === "owner") {
+    const slug = await getOwnedTenantSlug(perfil.userId);
+    redirect(slug ? `/admin/tenants/${slug}` : "/");
+  }
+
   const { tenants, totais, alertas } = await getAdminOverview();
+  const pendentes = await getPendentesTenants();
   const canvaOn = await isCanvaConnected();
+
+  // Alerta de cadastros aguardando ativação entra na fila abaixo.
+  const alertasVisiveis = alertas.filter((a) => !a.startsWith("[pendente]"));
 
   return (
     <div>
@@ -19,14 +34,51 @@ export default async function AdminHome({ searchParams }: PageProps<"/admin">) {
         <Card k="Custo acumulado" v={`$${totais.custo.toFixed(2)}`} />
       </div>
 
+      {/* Fila de ativação — auto-cadastro (Fase 7) */}
+      {pendentes.length > 0 && (
+        <section className="mb-8">
+          <h2 className="text-sm font-bold uppercase tracking-wide text-muted mb-1">
+            Aguardando ativação ({pendentes.length})
+          </h2>
+          <div className="flex flex-col gap-2">
+            {pendentes.map((p) => (
+              <form
+                key={p.id}
+                action={setTenantStatus}
+                className="flex flex-wrap items-center gap-3 bg-sky-50 border border-sky-200 rounded-xl px-4 py-3 text-sm"
+              >
+                <input type="hidden" name="id" value={p.id} />
+                <input type="hidden" name="status" value="ativo" />
+                <span>🟡</span>
+                <Link href={`/admin/tenants/${p.slug}`} className="font-semibold hover:underline">
+                  {p.nome}
+                </Link>
+                <span className="text-muted text-xs">/admin/tenants/{p.slug}</span>
+                <span className="ml-auto flex items-center gap-2">
+                  <Link
+                    href={`/admin/tenants/${p.slug}`}
+                    className="btn-secondary !py-1.5 !px-3 text-xs"
+                  >
+                    Revisar cadastro
+                  </Link>
+                  <button type="submit" className="btn-primary !py-1.5 !px-4 text-xs">
+                    ✓ Ativar
+                  </button>
+                </span>
+              </form>
+            ))}
+          </div>
+        </section>
+      )}
+
       {/* Alertas */}
       <section className="mb-8">
-        {alertas.length > 0 ? (
+        {alertasVisiveis.length > 0 ? (
           <div className="flex flex-col gap-2">
             <h2 className="text-sm font-bold uppercase tracking-wide text-muted mb-1">
               Requer atenção
             </h2>
-            {alertas.map((a, i) => (
+            {alertasVisiveis.map((a, i) => (
               <div
                 key={i}
                 className="flex gap-2 items-start bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-4 py-3 text-sm"

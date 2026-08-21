@@ -19,6 +19,7 @@ import {
   setTenantImageKey,
 } from "../actions";
 import { tenantHasKey, tenantHasImageKey, getTenantCanvaTemplate } from "@/lib/generate";
+import { getSessionProfile } from "@/lib/auth";
 
 export default async function EditTenantPage({
   params,
@@ -32,6 +33,11 @@ export default async function EditTenantPage({
     .eq("slug", slug)
     .single();
   if (!tenant) notFound();
+
+  // Owner (dono) gerencia o próprio tenant; admin global mantém poderes
+  // extras (status, excluir). RLS já limitou esta página ao próprio tenant.
+  const sp = await getSessionProfile();
+  const isAdmin = sp?.role === "admin";
 
   const [{ data: context }, { data: voice }, { data: channels }, { data: members }] =
     await Promise.all([
@@ -47,6 +53,28 @@ export default async function EditTenantPage({
   const hasKey = await tenantHasKey(tenant.id);
   const hasImageKey = await tenantHasImageKey(tenant.id);
   const canvaTemplate = await getTenantCanvaTemplate(tenant.id);
+
+  // Checklist de onboarding: o que ainda falta para este negócio produzir.
+  const faltas = [
+    !tenant.negocio_vende || !tenant.negocio_publico || !tenant.negocio_dor
+      ? { href: "#dados", label: "Completar os dados do negócio" }
+      : null,
+    !context?.o_que_vende || !context?.para_quem || !context?.dor || !context?.prova_disponivel
+      ? { href: "#contexto", label: "Preencher o contexto (venda, público, dor e prova)" }
+      : null,
+    !voice?.somos || !voice?.nao_somos
+      ? { href: "#voz", label: "Definir a voz da marca" }
+      : null,
+    !channels?.length
+      ? { href: "#canais", label: "Cadastrar pelo menos um canal" }
+      : null,
+    !hasKey
+      ? { href: "#chaves", label: "Conectar a chave Anthropic (IA de texto)" }
+      : null,
+    !canvaTemplate
+      ? { href: "#template", label: "Escolher o template de arte no Canva" }
+      : null,
+  ].filter(Boolean) as { href: string; label: string }[];
 
   return (
     <div className="max-w-2xl flex flex-col gap-6">
@@ -64,22 +92,50 @@ export default async function EditTenantPage({
         </Link>
       </div>
 
+      {tenant.status === "pendente" && (
+        <div className="flex gap-2 items-start bg-amber-50 border border-amber-300 text-amber-900 rounded-xl px-4 py-3 text-sm">
+          <span>🟡</span>
+          <span>
+            <strong>Aguardando ativação pela agência.</strong> Você já pode preencher tudo abaixo —
+            a produção de conteúdo libera assim que a conta for ativada.
+          </span>
+        </div>
+      )}
+
+      {faltas.length > 0 && (
+        <section className="card p-5 sm:p-6 border border-sky-200 bg-sky-50">
+          <h2 className="font-bold">Para começar a produzir ({faltas.length} passo{faltas.length > 1 ? "s" : ""})</h2>
+          <ul className="mt-2 flex flex-col gap-1.5 text-sm">
+            {faltas.map((f) => (
+              <li key={f.href}>
+                <a href={f.href} className="text-brand hover:underline">
+                  ☐ {f.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+
       {/* Dados */}
       <form action={updateTenant}>
         <input type="hidden" name="slug" value={tenant.slug} />
-        <Section title="Dados">
+        <Section id="dados" title="Dados">
           <div className="grid sm:grid-cols-2 gap-4">
             <Field label="Nome de exibição" name="nome_exibicao" defaultValue={tenant.nome_exibicao} />
-            <Select
-              label="Status"
-              name="status"
-              defaultValue={tenant.status}
-              options={[
-                { value: "ativo", label: "Ativo" },
-                { value: "pausado", label: "Pausado" },
-                { value: "arquivado", label: "Arquivado" },
-              ]}
-            />
+            {isAdmin && (
+              <Select
+                label="Status"
+                name="status"
+                defaultValue={tenant.status}
+                options={[
+                  { value: "ativo", label: "Ativo" },
+                  { value: "pausado", label: "Pausado" },
+                  { value: "arquivado", label: "Arquivado" },
+                  { value: "pendente", label: "Pendente (aguardando ativação)" },
+                ]}
+              />
+            )}
             <Select
               label="Objetivo"
               name="objetivo"
@@ -148,6 +204,7 @@ export default async function EditTenantPage({
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input type="hidden" name="slug" value={tenant.slug} />
         <Section
+          id="contexto"
           title="Contexto"
           desc="A Prova disponível é a ÚNICA fonte de números, cases e depoimentos que a produção pode afirmar."
         >
@@ -216,7 +273,7 @@ export default async function EditTenantPage({
       <form action={upsertVoice}>
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input type="hidden" name="slug" value={tenant.slug} />
-        <Section title="Voz">
+        <Section id="voz" title="Voz">
           <div className="flex flex-col gap-4">
             <div className="grid sm:grid-cols-2 gap-4">
               <SuggestionField
@@ -258,7 +315,7 @@ export default async function EditTenantPage({
       </form>
 
       {/* Canais */}
-      <Section title="Canais">
+      <Section id="canais" title="Canais">
         {channels && channels.length > 0 ? (
           <ul className="flex flex-col gap-2 mb-4">
             {channels.map((c) => (
@@ -308,6 +365,7 @@ export default async function EditTenantPage({
         <input type="hidden" name="tenant_id" value={tenant.id} />
         <input type="hidden" name="slug" value={tenant.slug} />
         <Section
+          id="chaves"
           title="Chave Anthropic (IA)"
           desc="Modelo A: cada empresa usa a própria conta Anthropic e paga direto. A chave fica só no servidor, nunca aparece no navegador."
         >
@@ -332,7 +390,9 @@ export default async function EditTenantPage({
       </form>
 
       {/* Brand Template do Canva (arte) */}
-      <CanvaTemplatePicker tenantId={tenant.id} slug={tenant.slug} current={canvaTemplate} />
+      <div id="template" className="scroll-mt-24">
+        <CanvaTemplatePicker tenantId={tenant.id} slug={tenant.slug} current={canvaTemplate} />
+      </div>
 
       {/* Chave de imagem (IA) */}
       <form action={setTenantImageKey}>
@@ -401,18 +461,20 @@ export default async function EditTenantPage({
         <CreateClientUserForm tenantId={tenant.id} slug={tenant.slug} />
       </Section>
 
-      {/* Zona de perigo */}
-      <section className="card p-6 sm:p-7 border border-red-200">
-        <h2 className="font-bold text-lg tracking-tight text-red-700">Zona de perigo</h2>
-        <p className="text-sm text-muted mt-1 mb-5 max-w-2xl leading-relaxed">
-          Excluir o tenant apaga permanentemente todo o conteúdo dele (pautas, peças, aprovações,
-          contexto, voz, canais, chave e template). Os usuários de login não são removidos.
-        </p>
-        <DeleteTenantButton
-          tenantId={tenant.id}
-          nome={tenant.nome_exibicao ?? tenant.slug}
-        />
-      </section>
+      {/* Zona de perigo — exclusiva da agência */}
+      {isAdmin && (
+        <section className="card p-6 sm:p-7 border border-red-200">
+          <h2 className="font-bold text-lg tracking-tight text-red-700">Zona de perigo</h2>
+          <p className="text-sm text-muted mt-1 mb-5 max-w-2xl leading-relaxed">
+            Excluir o tenant apaga permanentemente todo o conteúdo dele (pautas, peças, aprovações,
+            contexto, voz, canais, chave e template). Os usuários de login não são removidos.
+          </p>
+          <DeleteTenantButton
+            tenantId={tenant.id}
+            nome={tenant.nome_exibicao ?? tenant.slug}
+          />
+        </section>
+      )}
     </div>
   );
 }

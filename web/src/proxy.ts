@@ -7,7 +7,8 @@ import { updateSession } from "@/lib/supabase/proxy";
 export async function proxy(request: NextRequest) {
   const { response, user } = await updateSession(request);
   const path = request.nextUrl.pathname;
-  const isAuthPage = path === "/login";
+  // /cadastro é pública (auto-atendimento de novos negócios).
+  const isAuthPage = path === "/login" || path === "/cadastro";
 
   if (!user && !isAuthPage) {
     const url = request.nextUrl.clone();

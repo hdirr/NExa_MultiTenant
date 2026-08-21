@@ -138,6 +138,29 @@ export async function getAdminOverview(): Promise<AdminOverview> {
   };
 }
 
+// ── Fila de ativação (Fase 7): tenants criados por auto-cadastro ───────────
+export interface PendenteRow {
+  id: string;
+  slug: string;
+  nome: string;
+  criadoEm: string | null;
+}
+
+export async function getPendentesTenants(): Promise<PendenteRow[]> {
+  const supabase = await createClient();
+  const { data } = await supabase
+    .from("tenants")
+    .select("id, slug, nome_exibicao, created_at")
+    .eq("status", "pendente")
+    .order("created_at");
+  return (data ?? []).map((t) => ({
+    id: t.id,
+    slug: t.slug,
+    nome: t.nome_exibicao,
+    criadoEm: t.created_at ?? null,
+  }));
+}
+
 // ── Relatório do cliente (um tenant) ────────────────────────────────────────
 export interface ClientReport {
   tenant: { nome: string; vende: string | null } | null;

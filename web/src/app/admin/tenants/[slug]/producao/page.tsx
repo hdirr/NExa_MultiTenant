@@ -44,7 +44,7 @@ export default async function ProducaoPage({
 
   const { data: tenant } = await supabase
     .from("tenants")
-    .select("id, nome_exibicao, slug")
+    .select("id, nome_exibicao, slug, status")
     .eq("slug", slug)
     .single();
   if (!tenant) notFound();
@@ -92,6 +92,16 @@ export default async function ProducaoPage({
         <h1 className="text-2xl font-bold mt-2">{tenant.nome_exibicao}</h1>
         <p className="text-sm text-muted">Pauta, publicados e métricas</p>
       </div>
+
+      {tenant.status === "pendente" && (
+        <div className="flex gap-2 items-start bg-amber-50 border border-amber-300 text-amber-900 rounded-xl px-4 py-3 text-sm">
+          <span>🟡</span>
+          <span>
+            <strong>Aguardando ativação pela agência.</strong> A criação de pauta, peças e geração
+            por IA fica bloqueada até a ativação.
+          </span>
+        </div>
+      )}
 
       {/* PEÇAS */}
       <Section

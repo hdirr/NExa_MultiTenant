@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { createAdminClient } from "@/lib/supabase/admin";
-import { getSessionProfile } from "@/lib/auth";
+import { getSessionProfile, requireTenantAdmin, exigirTenantAtivo } from "@/lib/auth";
 import { slugify } from "@/lib/slugify";
 import {
   getTenantKey,
@@ -21,11 +21,11 @@ import {
   exportarPng,
   isCanvaConnected,
   listarBrandTemplates,
-  criarPasta,
-  moverParaPasta,
-  criarDesignDoTemplate,
   datasetDoTemplate,
   uploadAsset,
+  provisionCanvaForTenant,
+  criarPasta,
+  moverParaPasta,
   type BrandTemplateItem,
 } from "@/lib/canva";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -110,38 +110,20 @@ export async function createTenant(
 
 // Cria a pasta do tenant no Canva e semeia uma cópia editável do template-mestre
 // dentro dela (modelo pronto para rebrand). Guarda o folder_id no tenant.
-async function provisionCanvaForTenant(
-  admin: SupabaseClient,
-  tenantId: string,
-  nome: string,
-) {
-  if (!(await isCanvaConnected())) return;
-
-  const folderId = await criarPasta(`NExa — ${nome}`);
-  await admin.from("tenant_secrets").upsert(
-    { tenant_id: tenantId, canva_folder_id: folderId, updated_at: new Date().toISOString() },
-    { onConflict: "tenant_id" },
-  );
-
-  // Semente do modelo (cópia editável do mestre). Se falhar, a pasta já ficou.
-  const master = process.env.CANVA_MASTER_TEMPLATE || "EAHSCPMYcB8";
-  try {
-    const designId = await criarDesignDoTemplate(master);
-    await moverParaPasta(designId, folderId);
-  } catch (e) {
-    console.error("Canva: semente do modelo na pasta (ignorado):", (e as Error).message);
-  }
-}
+// (Implementação vive em lib/canva.ts para o cadastro autônomo reutilizar.)
 
 export async function updateTenant(formData: FormData) {
-  await requireAdmin();
+  const sp = await requireTenantAdmin(formData);
   const slug = s(formData, "slug");
   const supabase = await createClient();
+  // Status só muda pela agência: owner envia o form sem esse campo, e o
+  // gatilho do banco (0010) bloqueia qualquer tentativa de todo modo.
+  const statusPatch = sp.role === "admin" ? { status: s(formData, "status") } : {};
   const { error } = await supabase
     .from("tenants")
     .update({
       nome_exibicao: s(formData, "nome_exibicao"),
-      status: s(formData, "status"),
+      ...statusPatch,
       objetivo: s(formData, "objetivo") || null,
       aprovador: s(formData, "aprovador") || null,
       negocio_vende: s(formData, "negocio_vende") || null,
@@ -157,7 +139,7 @@ export async function updateTenant(formData: FormData) {
 }
 
 export async function upsertContext(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const tenantId = s(formData, "tenant_id");
   const slug = s(formData, "slug");
   const supabase = await createClient();
@@ -181,7 +163,7 @@ export async function upsertContext(formData: FormData) {
 }
 
 export async function upsertVoice(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const tenantId = s(formData, "tenant_id");
   const slug = s(formData, "slug");
   const supabase = await createClient();
@@ -200,7 +182,7 @@ export async function upsertVoice(formData: FormData) {
 }
 
 export async function addChannel(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const tenantId = s(formData, "tenant_id");
   const slug = s(formData, "slug");
   const formatos = formData.getAll("formatos").map((v) => String(v).trim()).filter(Boolean);
@@ -218,7 +200,7 @@ export async function addChannel(formData: FormData) {
 }
 
 export async function deleteChannel(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const id = s(formData, "id");
   const slug = s(formData, "slug");
   const supabase = await createClient();
@@ -239,7 +221,8 @@ function revalidateProducao(slug: string) {
 
 // ── Pauta ───────────────────────────────────────────────────────────────────
 export async function addPauta(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
+  await exigirTenantAtivo(s(formData, "slug"));
   const slug = s(formData, "slug");
   const supabase = await createClient();
   const { error } = await supabase.from("pauta_items").insert({
@@ -255,7 +238,7 @@ export async function addPauta(formData: FormData) {
 }
 
 export async function updatePautaStatus(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const slug = s(formData, "slug");
   const supabase = await createClient();
   const { error } = await supabase
@@ -267,7 +250,7 @@ export async function updatePautaStatus(formData: FormData) {
 }
 
 export async function deletePauta(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const slug = s(formData, "slug");
   const supabase = await createClient();
   const { error } = await supabase.from("pauta_items").delete().eq("id", s(formData, "id"));
@@ -277,7 +260,8 @@ export async function deletePauta(formData: FormData) {
 
 // ── Publicados ───────────────────────────────────────────────────────────────
 export async function addPublished(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
+  await exigirTenantAtivo(s(formData, "slug"));
   const slug = s(formData, "slug");
   const supabase = await createClient();
   const { error } = await supabase.from("published").insert({
@@ -294,7 +278,7 @@ export async function addPublished(formData: FormData) {
 }
 
 export async function deletePublished(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const slug = s(formData, "slug");
   const supabase = await createClient();
   const { error } = await supabase.from("published").delete().eq("id", s(formData, "id"));
@@ -304,7 +288,8 @@ export async function deletePublished(formData: FormData) {
 
 // ── Métricas ─────────────────────────────────────────────────────────────────
 export async function addMetric(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
+  await exigirTenantAtivo(s(formData, "slug"));
   const slug = s(formData, "slug");
   const supabase = await createClient();
   const { error } = await supabase.from("metrics").insert({
@@ -323,7 +308,7 @@ export async function addMetric(formData: FormData) {
 }
 
 export async function deleteMetric(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const slug = s(formData, "slug");
   const supabase = await createClient();
   const { error } = await supabase.from("metrics").delete().eq("id", s(formData, "id"));
@@ -333,7 +318,8 @@ export async function deleteMetric(formData: FormData) {
 
 // ── Peças ────────────────────────────────────────────────────────────────────
 export async function addPiece(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
+  await exigirTenantAtivo(s(formData, "slug"));
   const slug = s(formData, "slug");
   const supabase = await createClient();
   const { error } = await supabase.from("pieces").insert({
@@ -348,7 +334,8 @@ export async function addPiece(formData: FormData) {
 }
 
 export async function sendPieceForApproval(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
+  await exigirTenantAtivo(s(formData, "slug"));
   const slug = s(formData, "slug");
   const supabase = await createClient();
   const { error } = await supabase
@@ -361,7 +348,7 @@ export async function sendPieceForApproval(formData: FormData) {
 }
 
 export async function deletePiece(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const slug = s(formData, "slug");
   const supabase = await createClient();
   const { error } = await supabase.from("pieces").delete().eq("id", s(formData, "id"));
@@ -377,7 +364,7 @@ export async function createClientUser(
   _prev: CreateClientUserState,
   formData: FormData,
 ): Promise<CreateClientUserState> {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const slug = s(formData, "slug");
   const tenantId = s(formData, "tenant_id");
   const email = s(formData, "email").toLowerCase();
@@ -425,7 +412,7 @@ export async function createClientUser(
 }
 
 export async function removeMember(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const slug = s(formData, "slug");
   const tenantId = s(formData, "tenant_id");
   const profileId = s(formData, "profile_id");
@@ -441,7 +428,7 @@ export async function removeMember(formData: FormData) {
 
 // ── IA (Fase 4) ──────────────────────────────────────────────────────────────
 export async function setTenantKey(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const slug = s(formData, "slug");
   const tenantId = s(formData, "tenant_id");
   const key = s(formData, "anthropic_key");
@@ -458,7 +445,7 @@ export async function setTenantKey(formData: FormData) {
 
 // Salva a chave do gerador de imagens (Gemini/Nano Banana) do tenant.
 export async function setTenantImageKey(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const slug = s(formData, "slug");
   const tenantId = s(formData, "tenant_id");
   const key = s(formData, "image_api_key");
@@ -475,7 +462,7 @@ export async function setTenantImageKey(formData: FormData) {
 
 // Salva o Brand Template do Canva (BTM…) do tenant.
 export async function setTenantCanvaTemplate(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
   const slug = s(formData, "slug");
   const tenantId = s(formData, "tenant_id");
   const templateId = s(formData, "canva_template_id");
@@ -532,7 +519,8 @@ async function logMetric(
 }
 
 export async function generatePautaAI(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
+  await exigirTenantAtivo(s(formData, "slug"));
   const slug = s(formData, "slug");
   const tenantId = s(formData, "tenant_id");
   const key = await getTenantKey(tenantId);
@@ -562,7 +550,8 @@ export async function generatePautaAI(formData: FormData) {
 }
 
 export async function generatePieceAI(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
+  await exigirTenantAtivo(s(formData, "slug"));
   const slug = s(formData, "slug");
   const tenantId = s(formData, "tenant_id");
   const pautaId = s(formData, "pauta_id");
@@ -651,7 +640,8 @@ export async function generatePieceAI(formData: FormData) {
 // Gera a arte da peça no Canva: preenche o Brand Template com os campos e
 // exporta as imagens. Requer conta Canva conectada + template no tenant.
 export async function generateArtAI(formData: FormData) {
-  await requireAdmin();
+  await requireTenantAdmin(formData);
+  await exigirTenantAtivo(s(formData, "slug"));
   const slug = s(formData, "slug");
   const tenantId = s(formData, "tenant_id");
   const pieceId = s(formData, "piece_id");
@@ -799,8 +789,11 @@ async function rehospedarImagens(
 }
 
 // Lista os Brand Templates da conta Canva (para o seletor no painel do tenant).
+// Somente autenticação: é leitura; o owner precisa dela para escolher o
+// template do próprio tenant.
 export async function listCanvaTemplatesAction(): Promise<BrandTemplateItem[]> {
-  await requireAdmin();
+  const sp = await getSessionProfile();
+  if (!sp) throw new Error("não autenticado");
   if (!(await isCanvaConnected())) {
     throw new Error("Conecte a conta Canva da agência no painel antes de buscar templates.");
   }
@@ -818,4 +811,19 @@ export async function deleteTenant(formData: FormData) {
   const { error } = await admin.from("tenants").delete().eq("id", tenantId);
   if (error) throw new Error(error.message);
   redirect("/admin");
+}
+
+// Ativa / pausa / arquiva um tenant — decisão exclusiva da agência (Fase 7).
+// Usado pela fila de "pendentes" no painel admin.
+export async function setTenantStatus(formData: FormData) {
+  await requireAdmin();
+  const id = s(formData, "id");
+  const status = s(formData, "status");
+  if (!["ativo", "pausado", "arquivado"].includes(status)) {
+    throw new Error(`status inválido: ${status}`);
+  }
+  const admin = createAdminClient();
+  const { error } = await admin.from("tenants").update({ status }).eq("id", id);
+  if (error) throw new Error(error.message);
+  revalidatePath("/admin");
 }

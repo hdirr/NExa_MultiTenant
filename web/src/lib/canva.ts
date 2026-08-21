@@ -208,3 +208,31 @@ export async function criarDesignDoTemplate(brandTemplateId: string): Promise<st
   if (!id) throw new Error("Canva não retornou o design criado a partir do template.");
   return id as string;
 }
+
+import type { SupabaseClient } from "@supabase/supabase-js";
+
+// Cria a pasta do tenant no Canva e semeia uma cópia editável do
+// template-mestre dentro dela (modelo pronto para rebrand). Guarda o
+// folder_id no tenant. Best-effort: chamador decide ignorar falhas.
+export async function provisionCanvaForTenant(
+  admin: SupabaseClient,
+  tenantId: string,
+  nome: string,
+) {
+  if (!(await isCanvaConnected())) return;
+
+  const folderId = await criarPasta(`NExa — ${nome}`);
+  await admin.from("tenant_secrets").upsert(
+    { tenant_id: tenantId, canva_folder_id: folderId, updated_at: new Date().toISOString() },
+    { onConflict: "tenant_id" },
+  );
+
+  // Semente do modelo (cópia editável do mestre). Se falhar, a pasta já ficou.
+  const master = process.env.CANVA_MASTER_TEMPLATE || "EAHSCPMYcB8";
+  try {
+    const designId = await criarDesignDoTemplate(master);
+    await moverParaPasta(designId, folderId);
+  } catch (e) {
+    console.error("Canva: semente do modelo na pasta (ignorado):", (e as Error).message);
+  }
+}

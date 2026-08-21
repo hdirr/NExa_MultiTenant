@@ -4,8 +4,9 @@ import { getSessionProfile } from "@/lib/auth";
 import AppHeader from "@/components/AppHeader";
 import SignOutButton from "@/components/SignOutButton";
 
-// Guarda de rota: só admin acessa /admin/*. A autorização é reforçada aqui
-// (camada de servidor), não só no proxy.
+// Guarda de rota: admin vê tudo; owner (dono) acessa apenas as páginas do
+// próprio tenant — cada página restringe o escopo via RLS + checagem local.
+// A autorização é reforçada aqui (camada de servidor), não só no proxy.
 export default async function AdminLayout({
   children,
 }: {
@@ -13,7 +14,7 @@ export default async function AdminLayout({
 }) {
   const sp = await getSessionProfile();
   if (!sp) redirect("/login");
-  if (sp.role !== "admin") redirect("/");
+  if (sp.role === "client") redirect("/");
 
   return (
     <div className="flex-1 flex flex-col">

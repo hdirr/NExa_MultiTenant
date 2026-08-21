@@ -82,7 +82,10 @@ export default function LoginPage() {
         </form>
 
         <p className="text-xs text-muted text-center mt-5">
-          Acesso restrito · contas criadas pelo administrador
+          É um negócio novo?{" "}
+          <a href="/cadastro" className="font-semibold underline">
+            Cadastre sua empresa
+          </a>
         </p>
         {testFill && (
           <p className="text-xs text-center text-muted mt-2">
