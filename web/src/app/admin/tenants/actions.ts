@@ -8,12 +8,14 @@ import { getSessionProfile } from "@/lib/auth";
 import { slugify } from "@/lib/slugify";
 import {
   getTenantKey,
+  getTenantImageKey,
   getTenantCanvaTemplate,
   gerarPauta,
   gerarPeca,
   gerarCarrosselCampos,
   revisarMarca,
 } from "@/lib/generate";
+import { gerarImagem, CUSTO_POR_IMAGEM_USD } from "@/lib/imagens";
 import {
   autofillCarrossel,
   exportarPng,
@@ -22,6 +24,8 @@ import {
   criarPasta,
   moverParaPasta,
   criarDesignDoTemplate,
+  datasetDoTemplate,
+  uploadAsset,
   type BrandTemplateItem,
 } from "@/lib/canva";
 import type { SupabaseClient } from "@supabase/supabase-js";
@@ -199,10 +203,7 @@ export async function addChannel(formData: FormData) {
   await requireAdmin();
   const tenantId = s(formData, "tenant_id");
   const slug = s(formData, "slug");
-  const formatos = s(formData, "formatos")
-    .split(",")
-    .map((x) => x.trim())
-    .filter(Boolean);
+  const formatos = formData.getAll("formatos").map((v) => String(v).trim()).filter(Boolean);
   const freq = s(formData, "frequencia_semanal");
   const supabase = await createClient();
   const { error } = await supabase.from("channels").insert({
@@ -455,6 +456,23 @@ export async function setTenantKey(formData: FormData) {
   revalidatePath(`/admin/tenants/${slug}`);
 }
 
+// Salva a chave do gerador de imagens (Gemini/Nano Banana) do tenant.
+export async function setTenantImageKey(formData: FormData) {
+  await requireAdmin();
+  const slug = s(formData, "slug");
+  const tenantId = s(formData, "tenant_id");
+  const key = s(formData, "image_api_key");
+  const admin = createAdminClient();
+  const { error } = await admin
+    .from("tenant_secrets")
+    .upsert(
+      { tenant_id: tenantId, image_api_key: key || null, updated_at: new Date().toISOString() },
+      { onConflict: "tenant_id" },
+    );
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/tenants/${slug}`);
+}
+
 // Salva o Brand Template do Canva (BTM…) do tenant.
 export async function setTenantCanvaTemplate(formData: FormData) {
   await requireAdmin();
@@ -568,11 +586,13 @@ export async function generatePieceAI(formData: FormData) {
   let texto: string;
   let titulo: string;
   let campos: Record<string, string> | null = null;
+  let promptsImagem: string[] | null = null;
   let usageGen: { input: number; output: number; custo: number };
 
   if (isCarrossel) {
     const c = await gerarCarrosselCampos(key, t, ctx, voice, publicadosTemas, pauta.tema, pauta.angulo);
     campos = (c.parsed as Record<string, string> | null) ?? null;
+    promptsImagem = (c.parsed as { imagens?: string[] } | null)?.imagens ?? null;
     const ordem = ["hook", "s2", "s3", "s4", "s5", "s6", "s7", "cta"];
     texto = ordem.map((k, i) => `${i + 1}. ${campos?.[k] ?? ""}`).join("\n");
     titulo = pauta.tema;
@@ -590,21 +610,40 @@ export async function generatePieceAI(formData: FormData) {
   const bloqueantes = rev.parsed?.bloqueantes ?? [];
 
   const admin = createAdminClient();
-  await admin.from("pieces").insert({
-    tenant_id: tenantId,
-    pauta_id: pautaId,
-    formato,
-    titulo,
-    conteudo: { texto, campos, revisao: { aprovado, bloqueantes } },
-    status: "rascunho",
-  });
+  const { data: novaPeca, error: pErr } = await admin
+    .from("pieces")
+    .insert({
+      tenant_id: tenantId,
+      pauta_id: pautaId,
+      formato,
+      titulo,
+      conteudo: { texto, campos, imagens: promptsImagem, revisao: { aprovado, bloqueantes } },
+      status: "rascunho",
+    })
+    .select("id")
+    .single();
+  if (pErr) throw new Error(pErr.message);
+
+  // Arte automática: se a peça saiu em campos (carrossel) e passou pela revisão
+  // de marca, preenche o Brand Template (texto + imagens geradas por IA) e
+  // exporta os PNGs na hora — o design chega completo na pasta do cliente no
+  // Canva. Best-effort: falha no Canva não descarta a peça.
+  let custoImagens = 0;
+  if (campos && aprovado) {
+    try {
+      custoImagens = await gerarArteDaPeca(admin, tenantId, slug, novaPeca!.id as string);
+    } catch (e) {
+      console.error("Canva: arte automática da peça (ignorado):", (e as Error).message);
+    }
+  }
 
   const usage = {
     input: usageGen.input + rev.usage.input,
     output: usageGen.output + rev.usage.output,
-    custo: usageGen.custo + rev.usage.custo,
+    custo: usageGen.custo + rev.usage.custo + custoImagens,
   };
   await logMetric(tenantId, formato, 1, aprovado ? 1 : 0, usage);
+
   revalidatePath(`/admin/tenants/${slug}/producao`);
   revalidatePath("/admin");
 }
@@ -617,6 +656,21 @@ export async function generateArtAI(formData: FormData) {
   const tenantId = s(formData, "tenant_id");
   const pieceId = s(formData, "piece_id");
 
+  const admin = createAdminClient();
+  await gerarArteDaPeca(admin, tenantId, slug, pieceId);
+  revalidateProducao(slug);
+}
+
+// Núcleo da geração de arte: autofill do Brand Template com os campos de texto
+// + imagens geradas por IA nos campos de imagem do template, organização na
+// pasta do cliente e export dos PNGs (rehospedados no Storage). Devolve o custo
+// estimado das imagens (US$). Lança em caso de erro fatal — o chamador decide.
+async function gerarArteDaPeca(
+  admin: SupabaseClient,
+  tenantId: string,
+  slug: string,
+  pieceId: string,
+): Promise<number> {
   const templateId = await getTenantCanvaTemplate(tenantId);
   if (!templateId) {
     throw new Error("Configure o Brand Template do Canva deste tenant antes de gerar arte.");
@@ -630,14 +684,45 @@ export async function generateArtAI(formData: FormData) {
     supabase.from("pieces").select("conteudo").eq("id", pieceId).single(),
     supabase.from("tenants").select("nome_exibicao").eq("id", tenantId).maybeSingle(),
   ]);
-  const campos = (piece?.conteudo as { campos?: Record<string, string> } | null)?.campos;
+  const conteudo = (piece?.conteudo ?? null) as {
+    campos?: Record<string, string>;
+    imagens?: string[];
+  } | null;
+  const campos = conteudo?.campos;
   if (!campos || Object.keys(campos).length === 0) {
     throw new Error("Esta peça não tem campos de carrossel. Gere a peça no formato carrossel primeiro.");
   }
 
-  const { designId } = await autofillCarrossel(templateId, campos);
+  // Campos de IMAGEM do template → gera uma imagem IA por campo (até o nº de
+  // prompts salvos na peça). Falha em uma imagem não derruba a arte: segue
+  // só com texto.
+  const imagensData: Record<string, string> = {};
+  let custoImagens = 0;
+  const imageFields = Object.entries(await datasetDoTemplate(templateId))
+    .filter(([, def]) => def.type === "image")
+    .map(([name]) => name)
+    .sort();
+  const prompts = conteudo?.imagens ?? [];
+  if (imageFields.length > 0 && prompts.length > 0) {
+    const imgKey = await getTenantImageKey(tenantId);
+    if (!imgKey) {
+      console.error("Imagens IA: sem chave configurada para o tenant — arte sai só com texto.");
+    } else {
+      for (let i = 0; i < Math.min(imageFields.length, prompts.length); i++) {
+        try {
+          const png = await gerarImagem(imgKey, prompts[i]);
+          const assetId = await uploadAsset(png, `nexa-${pieceId}-${i + 1}.png`);
+          imagensData[imageFields[i]] = assetId;
+          custoImagens += CUSTO_POR_IMAGEM_USD;
+        } catch (e) {
+          console.error(`Imagens IA: campo ${imageFields[i]} (ignorado):`, (e as Error).message);
+          break;
+        }
+      }
+    }
+  }
 
-  const admin = createAdminClient();
+  const { designId } = await autofillCarrossel(templateId, campos, imagensData);
 
   // Organiza o design na pasta do cliente no Canva. Best-effort: se faltar o
   // escopo folder:write (reconectar) ou falhar, NÃO quebra a geração da arte.
@@ -658,7 +743,8 @@ export async function generateArtAI(formData: FormData) {
     .from("pieces")
     .update({ arte: { design_id: designId, imagens } })
     .eq("id", pieceId);
-  revalidateProducao(slug);
+
+  return custoImagens;
 }
 
 // Acha (ou cria uma vez) a pasta do Canva do tenant e devolve o id.

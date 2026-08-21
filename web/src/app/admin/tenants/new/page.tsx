@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useActionState, useRef, useState } from "react";
 import { createTenant } from "../actions";
 import { Field, Select, Section } from "@/components/form";
+import SuggestionField from "@/components/SuggestionField";
 import SubmitButton from "@/components/SubmitButton";
 import { slugify } from "@/lib/slugify";
 
@@ -95,31 +96,45 @@ export default function NewTenantPage() {
                 { value: "retencao", label: "Retenção" },
               ]}
             />
-
             <details className="sm:col-span-2 border border-line rounded-xl px-4 py-3">
               <summary className="cursor-pointer text-sm font-semibold text-muted select-none">
                 Preencher dados de negócio (opcional)
               </summary>
               <div className="grid gap-4 pt-4">
-                <Field
+                <SuggestionField
                   label="O que vende"
                   name="negocio_vende"
                   value={vende}
-                  onChange={(e) => setVende(e.target.value)}
+                  onChange={setVende}
                   placeholder="Uma frase"
+                  suggestions={[
+                    "Software de gestão para pequenas empresas",
+                    "Consultoria de marketing digital",
+                    "Curso online com mentoria",
+                  ]}
                 />
-                <Field
+                <SuggestionField
                   label="Para quem"
                   name="negocio_publico"
                   value={publico}
-                  onChange={(e) => setPublico(e.target.value)}
+                  onChange={setPublico}
                   placeholder="Cargo, porte, setor"
+                  suggestions={[
+                    "Donos de PME (5–50 funcionários)",
+                    "Gerentes de marketing",
+                    "Famílias com renda média",
+                  ]}
                 />
-                <Field
+                <SuggestionField
                   label="Diferencial"
                   name="negocio_diferencial"
                   value={diferencial}
-                  onChange={(e) => setDiferencial(e.target.value)}
+                  onChange={setDiferencial}
+                  suggestions={[
+                    "Garantia de resultado em 90 dias",
+                    "Atendimento humano, sem robô",
+                    "Implementação em uma semana",
+                  ]}
                 />
               </div>
             </details>

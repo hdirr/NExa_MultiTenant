@@ -10,6 +10,7 @@ export function Field({
   hint,
   value,
   onChange,
+  danger,
 }: {
   label: string;
   name: string;
@@ -20,11 +21,15 @@ export function Field({
   hint?: string;
   value?: string;
   onChange?: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  danger?: boolean;
 }) {
   const controlled = value !== undefined;
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="field-label">{label}</span>
+      <span className={`field-label ${danger ? "!text-red-600" : ""}`}>
+        {label}
+        {danger && <span className="font-normal"> · falta preencher</span>}
+      </span>
       <input
         name={name}
         type={type}
@@ -33,7 +38,7 @@ export function Field({
         onChange={onChange}
         placeholder={placeholder}
         required={required}
-        className="input"
+        className={`input ${danger ? "input-danger" : ""}`}
       />
       {hint && <span className="text-xs text-muted">{hint}</span>}
     </label>
@@ -47,6 +52,7 @@ export function TextArea({
   placeholder,
   rows = 3,
   hint,
+  danger,
 }: {
   label: string;
   name: string;
@@ -54,16 +60,20 @@ export function TextArea({
   placeholder?: string;
   rows?: number;
   hint?: string;
+  danger?: boolean;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="field-label">{label}</span>
+      <span className={`field-label ${danger ? "!text-red-600" : ""}`}>
+        {label}
+        {danger && <span className="font-normal"> · falta preencher</span>}
+      </span>
       <textarea
         name={name}
         defaultValue={defaultValue ?? ""}
         placeholder={placeholder}
         rows={rows}
-        className="input resize-y"
+        className={`input resize-y ${danger ? "input-danger" : ""}`}
       />
       {hint && <span className="text-xs text-muted">{hint}</span>}
     </label>
@@ -75,16 +85,25 @@ export function Select({
   name,
   defaultValue,
   options,
+  danger,
 }: {
   label: string;
   name: string;
   defaultValue?: string | null;
   options: { value: string; label: string }[];
+  danger?: boolean;
 }) {
   return (
     <label className="flex flex-col gap-1.5">
-      <span className="field-label">{label}</span>
-      <select name={name} defaultValue={defaultValue ?? options[0]?.value} className="input">
+      <span className={`field-label ${danger ? "!text-red-600" : ""}`}>
+        {label}
+        {danger && <span className="font-normal"> · falta preencher</span>}
+      </span>
+      <select
+        name={name}
+        defaultValue={defaultValue ?? options[0]?.value}
+        className={`input ${danger ? "input-danger" : ""}`}
+      >
         {options.map((o) => (
           <option key={o.value} value={o.value}>
             {o.label}
@@ -92,6 +111,39 @@ export function Select({
         ))}
       </select>
     </label>
+  );
+}
+
+// Grupo de checkboxes em formato de pílula. No servidor, leia os valores
+// marcados com formData.getAll(name).
+export function CheckboxGroup({
+  label,
+  name,
+  options,
+  defaultValue = [],
+}: {
+  label: string;
+  name: string;
+  options: { value: string; label: string }[];
+  defaultValue?: string[];
+}) {
+  return (
+    <fieldset className="flex flex-col gap-1.5">
+      <legend className="field-label mb-1.5">{label}</legend>
+      <div className="flex flex-wrap gap-2">
+        {options.map((o) => (
+          <label key={o.value} className="check-chip">
+            <input
+              type="checkbox"
+              name={name}
+              value={o.value}
+              defaultChecked={defaultValue.includes(o.value)}
+            />
+            <span>{o.label}</span>
+          </label>
+        ))}
+      </div>
+    </fieldset>
   );
 }
 

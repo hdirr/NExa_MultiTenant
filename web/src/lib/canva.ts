@@ -101,13 +101,16 @@ async function pollJob(basePath: string, jobId: string, tries = 30, delayMs = 20
 
 export type Campos = Record<string, string>;
 
-// Preenche o Brand Template com a copy e retorna o design criado.
+// Preenche o Brand Template com a copy (texto) e imagens (asset_id) e retorna
+// o design criado. Campos de texto → {type:"text"}; imagens → {type:"image"}.
 export async function autofillCarrossel(
   templateId: string,
   campos: Campos,
+  imagens: Record<string, string> = {},
 ): Promise<{ designId: string; designUrl?: string }> {
-  const data: Record<string, { type: "text"; text: string }> = {};
+  const data: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(campos)) data[k] = { type: "text", text: v };
+  for (const [k, assetId] of Object.entries(imagens)) data[k] = { type: "image", asset_id: assetId };
   const created = await canvaFetch(`/autofills`, {
     method: "POST",
     body: JSON.stringify({ brand_template_id: templateId, data }),
@@ -116,6 +119,37 @@ export async function autofillCarrossel(
   const design = job.result?.design;
   if (!design?.id) throw new Error("Autofill não retornou um design.");
   return { designId: design.id, designUrl: design.url };
+}
+
+// Campos de autofill do Brand Template com o tipo de cada um (text/image/…).
+// Usado para descobrir quais campos recebem imagem gerada por IA.
+export async function datasetDoTemplate(
+  templateId: string,
+): Promise<Record<string, { type: string }>> {
+  const j = await canvaFetch(`/brand-templates/${templateId}/dataset`);
+  return (j.dataset ?? {}) as Record<string, { type: string }>;
+}
+
+// Sobe bytes de imagem como asset do Canva e devolve o asset_id
+// (job assíncrono; URLs externas não são aceitas no autofill).
+export async function uploadAsset(bytes: Buffer, nome: string): Promise<string> {
+  const nameBase64 = Buffer.from(nome, "utf8").toString("base64");
+  const token = await getAccessToken();
+  const r = await fetch(`${API}/asset-uploads`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/octet-stream",
+      "Asset-Upload-Metadata": JSON.stringify({ name_base64: nameBase64 }),
+    },
+    body: new Uint8Array(bytes),
+  });
+  if (!r.ok) throw new Error(`Canva /asset-uploads → ${r.status} ${await r.text()}`);
+  const created = await r.json();
+  const job = await pollJob(`/asset-uploads`, created.job.id);
+  const assetId = job.asset?.id;
+  if (!assetId) throw new Error("Upload de asset não retornou o id.");
+  return assetId as string;
 }
 
 // Exporta o design como PNG (uma imagem por página) e retorna as URLs.

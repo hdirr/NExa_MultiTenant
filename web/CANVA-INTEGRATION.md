@@ -58,7 +58,11 @@ via `createAdminClient`), lidos **só no servidor**, nunca no browser — igual
 - [ ] `[VOCÊ]` **Rodar migração 0006** no Supabase + **registrar app do Canva** (5.1).
 
 ### Fase 5.3 — Amarração e produção
-- [ ] Arte aparece no `/aprovar` (cliente aprova o visual junto do texto).
+- [x] Arte aparece no `/aprovar` (cliente aprova o visual junto do texto).
+- [x] **Arte automática**: `generatePieceAI` já preenche o Brand Template e
+      exporta os PNGs na hora em que a peça passa pela revisão de marca
+      (carrossel com campos). O design chega completo na pasta do cliente no
+      Canva sem clique extra; botão manual continua para regerar.
 - [ ] **Deploy na Vercel** (OAuth redirect de produção + acesso 24/7).
 - [ ] Setup, uma vez por tenant: montar o Brand Template no Canva → marcar campos
       (via API: `create-brand-template-draft` → tag `hook`/`s2`…/`cta` →

@@ -2,6 +2,8 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { Field, Select, Section } from "@/components/form";
+import SuggestionField from "@/components/SuggestionField";
+import { FORMATOS, OBJETIVOS, REDES } from "@/lib/opcoes";
 import SubmitButton from "@/components/SubmitButton";
 import {
   addPauta,
@@ -47,13 +49,22 @@ export default async function ProducaoPage({
     .single();
   if (!tenant) notFound();
 
-  const [{ data: pauta }, { data: publicados }, { data: metrics }, { data: pieces }] =
+  const [{ data: pauta }, { data: publicados }, { data: metrics }, { data: pieces }, { data: channels }] =
     await Promise.all([
       supabase.from("pauta_items").select("*").eq("tenant_id", tenant.id).order("created_at"),
       supabase.from("published").select("*").eq("tenant_id", tenant.id).order("data", { ascending: false }),
       supabase.from("metrics").select("*").eq("tenant_id", tenant.id).order("data", { ascending: false }),
       supabase.from("pieces").select("*").eq("tenant_id", tenant.id).order("created_at", { ascending: false }),
+      supabase.from("channels").select("rede").eq("tenant_id", tenant.id).order("rede"),
     ]);
+
+  // Canais do tenant como opções prontas; sem canais, cai para a lista padrão.
+  const canalOptions = channels?.length
+    ? [...new Set(channels.map((c) => c.rede))].map((r) => ({
+        value: r,
+        label: r.charAt(0).toUpperCase() + r.slice(1),
+      }))
+    : REDES;
 
   // Aprovações das peças (para mostrar o histórico/comentário do cliente)
   const pieceIds = (pieces ?? []).map((p) => p.id);
@@ -95,10 +106,13 @@ export default async function ProducaoPage({
               return (
                 <li key={pc.id} className="border border-line rounded-lg px-3 py-2">
                   <div className="flex items-center justify-between gap-3 flex-wrap">
-                    <div className="text-sm">
-                      <span className="font-semibold">{pc.titulo}</span>
-                      {pc.formato && <span className="text-muted"> · {pc.formato}</span>}
-                    </div>
+                <div className="text-sm">
+                  <span className="font-semibold">{pc.titulo}</span>
+                  {pc.formato && <span className="text-muted"> · {pc.formato}</span>}
+                  {!pc.conteudo && (
+                    <span className="text-xs !text-red-600"> · falta conteúdo</span>
+                  )}
+                </div>
                     <div className="flex items-center gap-2">
                       <span className={`text-xs font-semibold rounded-full px-2.5 py-0.5 ${st.cls}`}>
                         {st.label}
@@ -135,17 +149,29 @@ export default async function ProducaoPage({
                     const arte = pc.arte as { imagens?: string[] } | null;
                     if (arte?.imagens?.length) {
                       return (
-                        <div className="flex flex-wrap gap-2 mt-2">
-                          {arte.imagens.map((src, i) => (
-                            <a key={i} href={src} target="_blank" rel="noreferrer">
-                              {/* eslint-disable-next-line @next/next/no-img-element */}
-                              <img
-                                src={src}
-                                alt={`slide ${i + 1}`}
-                                className="h-20 w-20 object-cover rounded border border-line"
-                              />
-                            </a>
-                          ))}
+                        <div className="mt-2">
+                          <div className="flex flex-wrap gap-2">
+                            {arte.imagens.map((src, i) => (
+                              <a key={i} href={src} target="_blank" rel="noreferrer">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img
+                                  src={src}
+                                  alt={`slide ${i + 1}`}
+                                  className="h-20 w-20 object-cover rounded border border-line"
+                                />
+                              </a>
+                            ))}
+                          </div>
+                          {campos && Object.keys(campos).length > 0 && (
+                            <form action={generateArtAI} className="mt-1">
+                              <input type="hidden" name="piece_id" value={pc.id} />
+                              <input type="hidden" name="tenant_id" value={tenant.id} />
+                              <input type="hidden" name="slug" value={tenant.slug} />
+                              <button className="text-xs font-semibold text-brand hover:underline">
+                                ↻ regerar arte no Canva
+                              </button>
+                            </form>
+                          )}
                         </div>
                       );
                     }
@@ -178,8 +204,17 @@ export default async function ProducaoPage({
 
         <form action={addPiece} className="grid sm:grid-cols-2 gap-3">
           {hid}
-          <Field label="Título" name="titulo" required />
-          <Field label="Formato" name="formato" placeholder="carrossel / reels / post" />
+          <SuggestionField
+            label="Título"
+            name="titulo"
+            required
+            suggestions={[
+              "5 erros de [tema] que custam caro",
+              "O método de 3 passos para [resultado]",
+              "Quanto custa [solução] em 2026",
+            ]}
+          />
+          <Select label="Formato" name="formato" options={FORMATOS} />
           <div className="sm:col-span-2">
             <label className="flex flex-col gap-1.5">
               <span className="text-sm font-semibold text-muted">Conteúdo</span>
@@ -205,12 +240,20 @@ export default async function ProducaoPage({
         </form>
         {pauta && pauta.length > 0 ? (
           <ul className="flex flex-col gap-2 mb-4">
-            {pauta.map((p) => (
+            {pauta.map((p) => {
+              const faltas = [
+                !p.angulo && "ângulo",
+                !p.objetivo && "objetivo",
+              ].filter(Boolean) as string[];
+              return (
               <li key={p.id} className="border border-line rounded-lg px-3 py-2">
                 <div className="flex items-center justify-between gap-3 flex-wrap">
                   <div className="text-sm">
                     <span className="font-semibold">{p.tema}</span>
                     {p.formato && <span className="text-muted"> · {p.formato}</span>}
+                    {faltas.length > 0 && (
+                      <span className="text-xs !text-red-600"> · falta {faltas.join(" e ")}</span>
+                    )}
                   </div>
                   <div className="flex items-center gap-2">
                     <form action={generatePieceAI}>
@@ -241,7 +284,8 @@ export default async function ProducaoPage({
                   </div>
                 </div>
               </li>
-            ))}
+              );
+            })}
           </ul>
         ) : (
           <p className="text-sm text-muted mb-4">Nenhum tema na pauta ainda.</p>
@@ -249,9 +293,27 @@ export default async function ProducaoPage({
 
         <form action={addPauta} className="grid sm:grid-cols-2 gap-3">
           {hid}
-          <Field label="Tema" name="tema" required />
-          <Field label="Ângulo" name="angulo" />
-          <Field label="Formato" name="formato" placeholder="carrossel / reels / post" />
+          <SuggestionField
+            label="Tema"
+            name="tema"
+            required
+            suggestions={[
+              "5 erros que [público] comete em [tema]",
+              "Quanto custa [solução] em 2026",
+              "Como [cliente] resolveu [dor] em 30 dias",
+            ]}
+          />
+          <SuggestionField
+            label="Ângulo"
+            name="angulo"
+            suggestions={[
+              "Dado próprio que o concorrente não tem",
+              "Contra o consenso: por que o caminho comum falha",
+              "Passo a passo verificável, ancorado em prova",
+            ]}
+          />
+          <Select label="Formato" name="formato" options={FORMATOS} />
+          <Select label="Objetivo" name="objetivo" options={OBJETIVOS} />
           <Select label="Status" name="status" options={STATUS} />
           <div className="sm:col-span-2">
             <SubmitButton>Adicionar tema</SubmitButton>
@@ -269,6 +331,9 @@ export default async function ProducaoPage({
                   <span className="text-muted tabular-nums">{p.data ?? ""}</span>{" "}
                   <span className="font-semibold">{p.tema}</span>
                   {p.formato && <span className="text-muted"> · {p.formato}</span>}
+                  {!p.desempenho && (
+                    <span className="text-xs !text-red-600"> · falta desempenho</span>
+                  )}
                   {p.desempenho && <div className="text-xs text-muted">{p.desempenho}</div>}
                 </div>
                 <form action={deletePublished}>
@@ -287,10 +352,18 @@ export default async function ProducaoPage({
           {hid}
           <Field label="Data" name="data" type="date" />
           <Field label="Tema" name="tema" required />
-          <Field label="Formato" name="formato" />
-          <Field label="Canal" name="canal" placeholder="instagram / linkedin" />
+          <Select label="Formato" name="formato" options={FORMATOS} />
+          <Select label="Canal" name="canal" options={canalOptions} />
           <Field label="Link" name="link" placeholder="https://…" />
-          <Field label="Desempenho" name="desempenho" placeholder="12.4k alcance · 340 salvamentos" />
+          <SuggestionField
+            label="Desempenho"
+            name="desempenho"
+            suggestions={[
+              "12.4k alcance · 340 salvamentos",
+              "8.2k impressões · 1.1% CTR",
+              "120 cliques · 18 leads",
+            ]}
+          />
           <div className="sm:col-span-2">
             <SubmitButton>Adicionar publicado</SubmitButton>
           </div>
@@ -339,7 +412,7 @@ export default async function ProducaoPage({
         <form action={addMetric} className="grid sm:grid-cols-3 gap-3">
           {hid}
           <Field label="Data" name="data" type="date" />
-          <Field label="Formato" name="formato" placeholder="carrossel" />
+          <Select label="Formato" name="formato" options={FORMATOS} />
           <Field label="Minutos do ciclo" name="minutos_ciclo" type="number" />
           <Field label="Peças geradas" name="pecas_geradas" type="number" />
           <Field label="Peças aprovadas" name="pecas_aprovadas" type="number" />

@@ -1,16 +1,27 @@
 # Handoff — Conteúdo Engine
 
+> **Atualização 2026-08-21 — Interface sem digitação + arte completa no Canva +
+> imagens IA.** Forms viraram escolhas prontas (checkbox/seleção/ideias
+> clicáveis que preenchem e seguem editáveis); campos cruciais vazios ficam
+> vermelhos na página do tenant e nas linhas da produção. Ao gerar um carrossel
+> aprovado pela revisão de marca, o app sozinho preenche o Brand Template no
+> Canva — textos + imagens geradas por IA (Gemini "Nano Banana",
+> ~US$0,04/imagem) — move para a pasta do cliente e exporta os PNGs. Cliente
+> aprova em 1 clique; reprovação é só marcar motivos prontos. Detalhes e
+> ferramentas/preços em [`web/IMAGENS-IA.md`](web/IMAGENS-IA.md). Migrações
+> novas: `0008_image_key.sql` (chave de imagem por tenant).
+>
+> **Rodar o app:** `cd web && npm install && npm run dev` → http://localhost:3000.
+> **Pendências:** rodar migração 0008; configurar chave Gemini (tela do tenant
+> ou env `GEMINI_API_KEY`) e marcar campos de imagem no Brand Template;
+> deploy na Vercel.
+>
 > **Atualização 2026-08-09 — App web (SaaS) em `web/`.** O projeto evoluiu de
 > engine em git para um **aplicativo multi-tenant** (Next.js 16 + Supabase +
 > Vercel). Fases 0–4 construídas: login/RLS, dashboards, gestão de tenants,
 > aprovação online e geração por IA no app (Modelo A: chave Anthropic por
 > tenant). Detalhes, setup e deploy em [`web/SETUP.md`](web/SETUP.md); migrações
 > em `web/supabase/migrations/0001..0005.sql`.
->
-> **Rodar o app:** `cd web && npm install && npm run dev` → http://localhost:3000
-> (env em `web/.env.local`). **Pendências:** rodar migração 0005; configurar a
-> chave Anthropic da Leaf na tela do tenant (Fase 4); trocar o seed de exemplo
-> por dados reais quando o briefing do Cesar voltar; deploy na Vercel.
 >
 > O restante deste documento descreve o **engine de conteúdo** original (skills
 > em markdown + scripts), que continua sendo a fonte das regras portadas para o

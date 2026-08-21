@@ -12,7 +12,12 @@ export async function submitApproval(formData: FormData) {
 
   const piece_id = (formData.get("piece_id") as string | null)?.trim();
   const decisao = (formData.get("decisao") as string | null)?.trim();
-  const comentario = (formData.get("comentario") as string | null)?.trim() || null;
+  // Motivos marcados em checkbox viram texto no início do comentário.
+  const motivos = formData.getAll("motivos").map((v) => String(v).trim()).filter(Boolean);
+  const detalhes = (formData.get("comentario") as string | null)?.trim() || null;
+  const comentario = motivos.length
+    ? [motivos.join("; "), detalhes].filter(Boolean).join(" — ")
+    : detalhes;
 
   if (!piece_id || (decisao !== "aprovado" && decisao !== "reprovado")) {
     throw new Error("dados inválidos");

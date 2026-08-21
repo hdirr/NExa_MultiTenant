@@ -18,6 +18,21 @@ export async function getTenantKey(tenantId: string): Promise<string | null> {
   return data?.anthropic_key ?? null;
 }
 
+// Chave do gerador de imagens do tenant; cai para a chave da agência (env).
+export async function getTenantImageKey(tenantId: string): Promise<string | null> {
+  const admin = createAdminClient();
+  const { data } = await admin
+    .from("tenant_secrets")
+    .select("image_api_key")
+    .eq("tenant_id", tenantId)
+    .maybeSingle();
+  return data?.image_api_key || process.env.GEMINI_API_KEY || null;
+}
+
+export async function tenantHasImageKey(tenantId: string): Promise<boolean> {
+  return (await getTenantImageKey(tenantId)) !== null;
+}
+
 export async function tenantHasKey(tenantId: string): Promise<boolean> {
   return (await getTenantKey(tenantId)) !== null;
 }
@@ -223,8 +238,9 @@ Retorne aprovado (true/false) e a lista de bloqueantes (item do checklist + expl
 }
 
 // ── Carrossel estruturado (campos p/ autofill do Canva) ──────────────────────
-// Devolve os campos nomeados do template: hook, s2..s7, cta.
-// Limites de caractere vão no prompt (structured outputs não valida maxLength).
+// Devolve os campos nomeados do template: hook, s2..s7, cta — e 3 prompts de
+// imagem (capa, meio, CTA) para o gerador de imagens. Limites de caractere vão
+// no prompt (structured outputs não valida maxLength).
 export async function gerarCarrosselCampos(
   key: string,
   t: TenantInfo,
@@ -239,19 +255,28 @@ Estrutura e LIMITES (respeite à risca, senão o texto estoura o layout):
 - hook: gancho da capa, máximo 45 caracteres, sem pergunta genérica.
 - s2 a s7: um argumento por slide, ancorado em exemplo/consequência, máximo 220 caracteres cada.
 - cta: chamada para ação coerente com o objetivo, máximo 110 caracteres.
+- imagens: exatamente 3 prompts em INGLÊS para geração de imagem por IA — [1] fundo da capa (hook), [2] fundo do argumento mais visual do meio, [3] fundo do slide de CTA. Estilo coerente com a marca e o público (fotográfico ou ilustração limpa), composição com área livre ao centro para texto sobreposto. PROIBIDO: letras, números, logos ou texto dentro da imagem.
 ${regrasDuras(ctx, voice, publicadosTemas)}`;
   const user = `${contextoBloco(ctx, voice, t)}
 
 Tema aprovado: ${tema}
 Ângulo: ${angulo}
 
-Produza o carrossel preenchendo EXATAMENTE os campos hook, s2, s3, s4, s5, s6, s7, cta. Texto pronto para publicar, dentro dos limites de caractere. Se não houver prova para um número, mude o ângulo do slide — nunca invente.`;
+Produza o carrossel preenchendo EXATAMENTE os campos hook, s2, s3, s4, s5, s6, s7, cta e o array "imagens" com 3 prompts. Texto pronto para publicar, dentro dos limites de caractere. Se não houver prova para um número, mude o ângulo do slide — nunca invente.`;
   const props = ["hook", "s2", "s3", "s4", "s5", "s6", "s7", "cta"];
   const schema = {
     type: "object",
     additionalProperties: false,
-    properties: Object.fromEntries(props.map((p) => [p, { type: "string" }])),
-    required: props,
+    properties: {
+      ...Object.fromEntries(props.map((p) => [p, { type: "string" }])),
+      imagens: {
+        type: "array",
+        items: { type: "string" },
+        minItems: 3,
+        maxItems: 3,
+      },
+    },
+    required: [...props, "imagens"],
   };
   return callJSON(key, system, user, schema);
 }

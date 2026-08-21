@@ -1,7 +1,9 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { Field, TextArea, Select, Section } from "@/components/form";
+import { Field, TextArea, Select, CheckboxGroup, Section } from "@/components/form";
+import SuggestionField from "@/components/SuggestionField";
+import { FORMATOS, REDES } from "@/lib/opcoes";
 import SubmitButton from "@/components/SubmitButton";
 import CanvaTemplatePicker from "./CanvaTemplatePicker";
 import DeleteTenantButton from "./DeleteTenantButton";
@@ -14,8 +16,9 @@ import {
   deleteChannel,
   removeMember,
   setTenantKey,
+  setTenantImageKey,
 } from "../actions";
-import { tenantHasKey, getTenantCanvaTemplate } from "@/lib/generate";
+import { tenantHasKey, tenantHasImageKey, getTenantCanvaTemplate } from "@/lib/generate";
 
 export default async function EditTenantPage({
   params,
@@ -42,6 +45,7 @@ export default async function EditTenantPage({
     ]);
 
   const hasKey = await tenantHasKey(tenant.id);
+  const hasImageKey = await tenantHasImageKey(tenant.id);
   const canvaTemplate = await getTenantCanvaTemplate(tenant.id);
 
   return (
@@ -88,10 +92,50 @@ export default async function EditTenantPage({
               ]}
             />
             <Field label="Aprovador" name="aprovador" defaultValue={tenant.aprovador} />
-            <Field label="O que vende" name="negocio_vende" defaultValue={tenant.negocio_vende} />
-            <Field label="Para quem" name="negocio_publico" defaultValue={tenant.negocio_publico} />
-            <Field label="Dor" name="negocio_dor" defaultValue={tenant.negocio_dor} />
-            <Field label="Diferencial" name="negocio_diferencial" defaultValue={tenant.negocio_diferencial} />
+            <SuggestionField
+              label="O que vende"
+              name="negocio_vende"
+              defaultValue={tenant.negocio_vende}
+              danger={!tenant.negocio_vende}
+              suggestions={[
+                "Software de gestão para pequenas empresas",
+                "Consultoria de marketing digital",
+                "Curso online com mentoria",
+              ]}
+            />
+            <SuggestionField
+              label="Para quem"
+              name="negocio_publico"
+              defaultValue={tenant.negocio_publico}
+              danger={!tenant.negocio_publico}
+              suggestions={[
+                "Donos de PME (5–50 funcionários)",
+                "Gerentes de marketing",
+                "Famílias com renda média",
+              ]}
+            />
+            <SuggestionField
+              label="Dor"
+              name="negocio_dor"
+              defaultValue={tenant.negocio_dor}
+              danger={!tenant.negocio_dor}
+              suggestions={[
+                "Perde horas por semana em processo manual",
+                "Não sabe se o investimento em marketing volta",
+                "Depende de um único especialista",
+              ]}
+            />
+            <SuggestionField
+              label="Diferencial"
+              name="negocio_diferencial"
+              defaultValue={tenant.negocio_diferencial}
+              danger={!tenant.negocio_diferencial}
+              suggestions={[
+                "Garantia de resultado em 90 dias",
+                "Atendimento humano, sem robô",
+                "Implementação em uma semana",
+              ]}
+            />
           </div>
           <div className="mt-5">
             <SubmitButton />
@@ -108,15 +152,55 @@ export default async function EditTenantPage({
           desc="A Prova disponível é a ÚNICA fonte de números, cases e depoimentos que a produção pode afirmar."
         >
           <div className="flex flex-col gap-4">
-            <TextArea label="O que vende" name="o_que_vende" defaultValue={context?.o_que_vende} rows={2} />
-            <TextArea label="Para quem" name="para_quem" defaultValue={context?.para_quem} rows={2} />
-            <TextArea label="A dor (palavras do cliente)" name="dor" defaultValue={context?.dor} rows={2} />
-            <TextArea
+            <SuggestionField
+              label="O que vende"
+              name="o_que_vende"
+              defaultValue={context?.o_que_vende}
+              multiline
+              rows={2}
+              danger={!context?.o_que_vende}
+              suggestions={[
+                "Plano mensal de [serviço] com entrega em [prazo]",
+                "Produto [categoria] vendido direto ao consumidor",
+              ]}
+            />
+            <SuggestionField
+              label="Para quem"
+              name="para_quem"
+              defaultValue={context?.para_quem}
+              multiline
+              rows={2}
+              danger={!context?.para_quem}
+              suggestions={[
+                "Pessoas que já tentaram [alternativa] e falharam",
+                "Empresas com [porte] no setor [setor]",
+              ]}
+            />
+            <SuggestionField
+              label="A dor (palavras do cliente)"
+              name="dor"
+              defaultValue={context?.dor}
+              multiline
+              rows={2}
+              danger={!context?.dor}
+              suggestions={[
+                "“Perco tempo demais com [tarefa]”",
+                "“Já paguei por [solução] e não funcionou”",
+              ]}
+            />
+            <SuggestionField
               label="★ Prova disponível"
               name="prova_disponivel"
               defaultValue={context?.prova_disponivel}
+              multiline
               rows={4}
+              danger={!context?.prova_disponivel}
               hint="Números reais, cases com resultado, depoimentos aprovados. Nada fora daqui pode ser afirmado como fato."
+              suggestions={[
+                "Case: cliente X cresceu 3x em 6 meses (com aprovação)",
+                "+500 clientes atendidos desde 2020",
+                "Depoimento aprovado: “…”",
+              ]}
             />
             <TextArea label="Objeções" name="objecoes" defaultValue={context?.objecoes} rows={2} />
             <TextArea label="Concorrentes e diferença" name="concorrentes" defaultValue={context?.concorrentes} rows={2} />
@@ -135,8 +219,30 @@ export default async function EditTenantPage({
         <Section title="Voz">
           <div className="flex flex-col gap-4">
             <div className="grid sm:grid-cols-2 gap-4">
-              <TextArea label="Somos" name="somos" defaultValue={voice?.somos} rows={2} />
-              <TextArea label="Não somos" name="nao_somos" defaultValue={voice?.nao_somos} rows={2} />
+              <SuggestionField
+                label="Somos"
+                name="somos"
+                defaultValue={voice?.somos}
+                multiline
+                rows={2}
+                danger={!voice?.somos}
+                suggestions={[
+                  "Direto, técnico e calmo",
+                  "Próximo do cliente, sem jargão",
+                ]}
+              />
+              <SuggestionField
+                label="Não somos"
+                name="nao_somos"
+                defaultValue={voice?.nao_somos}
+                multiline
+                rows={2}
+                danger={!voice?.nao_somos}
+                suggestions={[
+                  "Vendedores agressivos",
+                  "Corporativo e formal demais",
+                ]}
+              />
             </div>
             <TextArea
               label="Palavras proibidas (jargão deste tenant)"
@@ -182,14 +288,16 @@ export default async function EditTenantPage({
           <p className="text-sm text-muted mb-4">Nenhum canal ainda.</p>
         )}
 
-        <form action={addChannel} className="grid sm:grid-cols-4 gap-3 items-end">
+        <form action={addChannel} className="flex flex-col gap-3">
           <input type="hidden" name="tenant_id" value={tenant.id} />
           <input type="hidden" name="slug" value={tenant.slug} />
-          <Field label="Rede" name="rede" placeholder="instagram" required />
-          <Field label="Handle" name="handle" placeholder="@marca" />
-          <Field label="Formatos" name="formatos" placeholder="carrossel, reels" hint="separados por vírgula" />
-          <Field label="Freq/sem" name="frequencia_semanal" type="number" />
-          <div className="sm:col-span-4">
+          <div className="grid sm:grid-cols-3 gap-3 items-end">
+            <Select label="Rede" name="rede" options={REDES} />
+            <Field label="Handle" name="handle" placeholder="@marca" />
+            <Field label="Freq/sem" name="frequencia_semanal" type="number" />
+          </div>
+          <CheckboxGroup label="Formatos" name="formatos" options={FORMATOS} />
+          <div>
             <SubmitButton>Adicionar canal</SubmitButton>
           </div>
         </form>
@@ -225,6 +333,34 @@ export default async function EditTenantPage({
 
       {/* Brand Template do Canva (arte) */}
       <CanvaTemplatePicker tenantId={tenant.id} slug={tenant.slug} current={canvaTemplate} />
+
+      {/* Chave de imagem (IA) */}
+      <form action={setTenantImageKey}>
+        <input type="hidden" name="tenant_id" value={tenant.id} />
+        <input type="hidden" name="slug" value={tenant.slug} />
+        <Section
+          title="Chave de imagem (IA)"
+          desc="Gera as imagens dos slides com o Google Gemini (Nano Banana), ~US$ 0,04 por imagem. Se ficar vazia, usa a chave da agência (GEMINI_API_KEY no servidor)."
+        >
+          <div className="mb-3">
+            {hasImageKey ? (
+              <span className="text-sm font-semibold text-emerald-700">✓ Chave configurada</span>
+            ) : (
+              <span className="text-sm font-semibold text-amber-700">Nenhuma chave configurada</span>
+            )}
+          </div>
+          <Field
+            label={hasImageKey ? "Substituir chave" : "Chave Gemini (AIza…)"}
+            name="image_api_key"
+            type="password"
+            placeholder="AIza..."
+            hint="Cole a chave da conta Google AI Studio da empresa. Deixe vazio e salve para remover."
+          />
+          <div className="mt-4">
+            <SubmitButton>Salvar chave de imagem</SubmitButton>
+          </div>
+        </Section>
+      </form>
 
       {/* Usuários-cliente */}
       <Section
